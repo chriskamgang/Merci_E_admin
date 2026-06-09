@@ -7,7 +7,25 @@
 <meta http-equiv="Expires" content="0">
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title inertia>{{ app_name() ?? 'Restart' }} - Admin App</title>
+    <title inertia>{{ app_name() ?? 'Merci E' }}</title>
+
+    <!-- Open Graph / WhatsApp / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="{{ url('/') }}">
+    <meta property="og:title" content="Merci E — Votre taxi intelligent à Bafoussam">
+    <meta property="og:description" content="Taxi, livraison, covoiturage et location de véhicule à Bafoussam, Cameroun. Réservez en quelques secondes avec Merci E.">
+    <meta property="og:image" content="{{ asset('landing/logo.png') }}">
+    <meta property="og:site_name" content="Merci E">
+    <meta property="og:locale" content="fr_CM">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Merci E — Votre taxi intelligent à Bafoussam">
+    <meta name="twitter:description" content="Taxi, livraison, covoiturage et location de véhicule à Bafoussam, Cameroun.">
+    <meta name="twitter:image" content="{{ asset('landing/logo.png') }}">
+
+    <!-- General SEO -->
+    <meta name="description" content="Merci E — Taxi, livraison, covoiturage et location à Bafoussam, Cameroun. Téléchargez l'application et réservez en quelques secondes.">
     <script>
         (function() {
             var theme = localStorage.getItem('theme');
