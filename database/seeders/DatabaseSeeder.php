@@ -48,5 +48,8 @@ class DatabaseSeeder extends Seeder
 
         // Merci E — configuration Cameroun (toujours en dernier)
         $this->call(MercieSeeder::class);
+
+        // Merci E — landing pages data (overwrites with production content)
+        $this->call(MerciELandingSeeder::class);
     }
 }

@@ -89,17 +89,17 @@ export default {
         response = await axios.post('/single-landingpage/contactmessage', requestData);
 
         if (response.status === 201) {
-          successMessage.value = 'Message envoy\u00e9 avec succ\u00e8s.';
+          successMessage.value = 'Message envoyé avec succès.';
           form.reset();
         } else {
-          alertMessage.value = '\u00c9chec de l\'envoi du message.';
+          alertMessage.value = 'Échec de l\'envoi du message.';
         }
       } catch (error) {
         if (error.response && error.response.status === 422) {
           errors.value = error.response.data.errors;
         } else {
           console.error('Error saving Message:', error);
-          alertMessage.value = '\u00c9chec de l\'envoi du message.';
+          alertMessage.value = 'Échec de l\'envoi du message.';
         }
       }
     };
@@ -205,10 +205,10 @@ export default {
         <ul class="me-nav__links">
           <li><a @click.prevent="scrollTo('hero')" href="#hero">Accueil</a></li>
           <li><a @click.prevent="scrollTo('services')" href="#services">Services</a></li>
-          <li><a @click.prevent="scrollTo('how-it-works')" href="#how-it-works">Comment \u00e7a marche</a></li>
+          <li><a @click.prevent="scrollTo('how-it-works')" href="#how-it-works">Comment ça marche</a></li>
           <li><a @click.prevent="scrollTo('screenshots')" href="#screenshots">Captures</a></li>
           <li><a @click.prevent="scrollTo('why-us')" href="#why-us">Pourquoi nous</a></li>
-          <li><a @click.prevent="scrollTo('about')" href="#about">\u00c0 propos</a></li>
+          <li><a @click.prevent="scrollTo('about')" href="#about">À propos</a></li>
           <li><a @click.prevent="scrollTo('contact')" href="#contact">Contact</a></li>
         </ul>
 
@@ -247,10 +247,10 @@ export default {
       <div class="me-nav__mobile" :class="{ 'me-nav__mobile--open': mobileMenuOpen }">
         <a @click.prevent="scrollTo('hero')" href="#">Accueil</a>
         <a @click.prevent="scrollTo('services')" href="#">Services</a>
-        <a @click.prevent="scrollTo('how-it-works')" href="#">Comment \u00e7a marche</a>
+        <a @click.prevent="scrollTo('how-it-works')" href="#">Comment ça marche</a>
         <a @click.prevent="scrollTo('screenshots')" href="#">Captures</a>
         <a @click.prevent="scrollTo('why-us')" href="#">Pourquoi nous</a>
-        <a @click.prevent="scrollTo('about')" href="#">\u00c0 propos</a>
+        <a @click.prevent="scrollTo('about')" href="#">À propos</a>
         <a @click.prevent="scrollTo('contact')" href="#">Contact</a>
         <div class="me-nav__mobile-actions">
           <a href="/mi-admin" class="me-btn me-btn--primary me-btn--sm" style="width:100%;text-align:center;">
@@ -287,7 +287,7 @@ export default {
           </p>
           <div class="me-hero__actions">
             <a :href="singlelandingpage.download_user_link_android" target="_blank" class="me-btn me-btn--primary me-btn--lg">
-              <i class="ri-google-play-fill"></i> T\u00e9l\u00e9charger
+              <i class="ri-google-play-fill"></i> Télécharger
             </a>
             <a @click.prevent="scrollTo('contact')" href="#contact" class="me-btn me-btn--outline-dark me-btn--lg">
               <i class="ri-mail-send-line"></i> Nous contacter
@@ -296,7 +296,7 @@ export default {
         </div>
         <div class="me-hero__phones">
           <div class="me-hero__phone me-hero__phone--back">
-            <img src="/landing/screenshots/user-booking.png" alt="R\u00e9servation" />
+            <img src="/landing/screenshots/user-booking.png" alt="Réservation" />
           </div>
           <div class="me-hero__phone me-hero__phone--front">
             <img src="/landing/screenshots/user-home.png" alt="Accueil" />
@@ -334,7 +334,7 @@ export default {
               }">
               <swiper-slide>
                 <div class="me-service-card">
-                  <div class="me-service-card__icon"><i class="ri-taxi-line"></i></div>
+                  <div class="me-service-card__icon"><i class="ri-taxi-fill"></i></div>
                   <h4 class="me-service-card__title">{{ singlelandingpage.adv_box1_title }}</h4>
                   <p class="me-service-card__text">{{ stripHtmlTags(singlelandingpage.adv_box1_para) }}</p>
                   <div class="me-service-card__media" v-if="singlelandingpage.adv_box1_img_url">
@@ -346,7 +346,7 @@ export default {
               </swiper-slide>
               <swiper-slide>
                 <div class="me-service-card">
-                  <div class="me-service-card__icon"><i class="ri-map-pin-line"></i></div>
+                  <div class="me-service-card__icon"><i class="ri-truck-fill"></i></div>
                   <h4 class="me-service-card__title">{{ singlelandingpage.adv_box2_title }}</h4>
                   <p class="me-service-card__text">{{ stripHtmlTags(singlelandingpage.adv_box2_para) }}</p>
                   <div class="me-service-card__media" v-if="singlelandingpage.adv_box2_img_url">
@@ -358,7 +358,7 @@ export default {
               </swiper-slide>
               <swiper-slide>
                 <div class="me-service-card">
-                  <div class="me-service-card__icon"><i class="ri-group-line"></i></div>
+                  <div class="me-service-card__icon"><i class="ri-team-fill"></i></div>
                   <h4 class="me-service-card__title">{{ singlelandingpage.adv_box3_title }}</h4>
                   <p class="me-service-card__text">{{ stripHtmlTags(singlelandingpage.adv_box3_para) }}</p>
                   <div class="me-service-card__media" v-if="singlelandingpage.adv_box3_img_url">
@@ -370,7 +370,7 @@ export default {
               </swiper-slide>
               <swiper-slide>
                 <div class="me-service-card">
-                  <div class="me-service-card__icon"><i class="ri-truck-line"></i></div>
+                  <div class="me-service-card__icon"><i class="ri-car-fill"></i></div>
                   <h4 class="me-service-card__title">{{ singlelandingpage.adv_box4_title }}</h4>
                   <p class="me-service-card__text">{{ stripHtmlTags(singlelandingpage.adv_box4_para) }}</p>
                   <div class="me-service-card__media" v-if="singlelandingpage.adv_box4_img_url">
@@ -382,7 +382,7 @@ export default {
               </swiper-slide>
               <swiper-slide>
                 <div class="me-service-card">
-                  <div class="me-service-card__icon"><i class="ri-shield-star-line"></i></div>
+                  <div class="me-service-card__icon"><i class="ri-smartphone-fill"></i></div>
                   <h4 class="me-service-card__title">{{ singlelandingpage.adv_box5_title }}</h4>
                   <p class="me-service-card__text">{{ stripHtmlTags(singlelandingpage.adv_box5_para) }}</p>
                   <div class="me-service-card__media" v-if="singlelandingpage.adv_box5_img_url">
@@ -516,9 +516,9 @@ export default {
     <section class="me-section" id="screenshots">
       <div class="me-container">
         <div class="me-section__header">
-          <h2 class="me-section__title">D\u00e9couvrez l'application</h2>
+          <h2 class="me-section__title">Découvrez l'application</h2>
           <div class="me-section__bar"></div>
-          <p class="me-section__subtitle">Explorez les fonctionnalit\u00e9s de Merci E \u00e0 travers nos applications passager et chauffeur.</p>
+          <p class="me-section__subtitle">Explorez les fonctionnalités de Merci E à travers nos applications passager et chauffeur.</p>
         </div>
 
         <div class="me-toggle" style="margin-bottom:40px;">
@@ -561,8 +561,8 @@ export default {
             </swiper-slide>
             <swiper-slide>
               <div class="me-screenshot">
-                <div class="me-screenshot__frame"><img src="/landing/screenshots/user-booking.png" alt="R\u00e9servation" /></div>
-                <span class="me-screenshot__label">R\u00e9servation</span>
+                <div class="me-screenshot__frame"><img src="/landing/screenshots/user-booking.png" alt="Réservation" /></div>
+                <span class="me-screenshot__label">Réservation</span>
               </div>
             </swiper-slide>
             <swiper-slide>
@@ -704,7 +704,7 @@ export default {
             <img :src="singlelandingpage.about_img_url" alt="About" class="me-about__img" />
           </div>
           <div class="me-about__text-col">
-            <span class="me-label">\u00c0 propos</span>
+            <span class="me-label">À propos</span>
             <h2 class="me-about__title">
               <span>{{ singlelandingpage.about_title_1 }}</span>
               <span class="me-text-accent"> {{ singlelandingpage.about_title_2 }}</span>
@@ -889,19 +889,19 @@ export default {
         <div class="me-footer__top">
           <div class="me-footer__brand">
             <img :src="headerLogoUrl()" alt="Merci E" class="me-footer__logo" />
-            <p class="me-footer__tagline">La mobilit\u00e9 simplifi\u00e9e au Cameroun.</p>
+            <p class="me-footer__tagline">La mobilité simplifiée au Cameroun.</p>
           </div>
           <div class="me-footer__links">
             <h5>Navigation</h5>
             <a @click.prevent="scrollTo('hero')" href="#">Accueil</a>
             <a @click.prevent="scrollTo('services')" href="#">Services</a>
-            <a @click.prevent="scrollTo('how-it-works')" href="#">Comment \u00e7a marche</a>
-            <a @click.prevent="scrollTo('about')" href="#">\u00c0 propos</a>
+            <a @click.prevent="scrollTo('how-it-works')" href="#">Comment ça marche</a>
+            <a @click.prevent="scrollTo('about')" href="#">À propos</a>
           </div>
           <div class="me-footer__links">
             <h5>Application</h5>
-            <a @click.prevent="scrollTo('screenshots')" href="#">Captures d'\u00e9cran</a>
-            <a @click.prevent="scrollTo('download')" href="#">T\u00e9l\u00e9charger</a>
+            <a @click.prevent="scrollTo('screenshots')" href="#">Captures d'écran</a>
+            <a @click.prevent="scrollTo('download')" href="#">Télécharger</a>
             <a @click.prevent="scrollTo('contact')" href="#">Contact</a>
             <a href="/mi-admin">Dashboard</a>
           </div>
@@ -913,7 +913,7 @@ export default {
           </div>
         </div>
         <div class="me-footer__bottom">
-          <p>&copy; {{ new Date().getFullYear() }} Merci E. Tous droits r\u00e9serv\u00e9s.</p>
+          <p>&copy; {{ new Date().getFullYear() }} Merci E. Tous droits réservés.</p>
           <p class="me-footer__credit">Dev by Chris Skyler</p>
         </div>
       </div>
@@ -1084,10 +1084,22 @@ export default {
   align-items: center;
   justify-content: space-between;
   height: 72px;
+  overflow: hidden;
+}
+.me-nav__logo {
+  display: flex;
+  align-items: center;
+  height: 45px;
+  overflow: hidden;
+  flex-shrink: 0;
 }
 .me-nav__logo-img {
-  height: 40px;
-  width: auto;
+  height: 45px !important;
+  width: auto !important;
+  max-width: 150px !important;
+  max-height: 45px !important;
+  object-fit: contain;
+  display: block;
 }
 .me-nav__links {
   display: flex;
@@ -1803,20 +1815,24 @@ export default {
 .me-footer {
   background: #0d1a2e;
   color: rgba(255,255,255,0.7);
-  padding: 64px 0 0;
+  padding: 32px 0 0;
 }
 .me-footer__top {
   display: flex;
-  gap: 48px;
-  padding-bottom: 48px;
+  gap: 32px;
+  padding-bottom: 24px;
   border-bottom: 1px solid rgba(255,255,255,0.08);
 }
 .me-footer__brand {
-  flex: 1.5;
+  flex: 1;
+  max-width: 250px;
 }
 .me-footer__logo {
-  height: 36px;
-  width: auto;
+  height: 45px !important;
+  width: auto !important;
+  max-width: 150px !important;
+  object-fit: contain;
+  display: block;
   margin-bottom: 12px;
 }
 .me-footer__tagline {
@@ -1831,16 +1847,16 @@ export default {
   font-size: 14px;
   font-weight: 700;
   color: #fff;
-  margin: 0 0 16px 0;
+  margin: 0 0 10px 0;
   text-transform: uppercase;
   letter-spacing: 1px;
 }
 .me-footer__links a,
 .me-footer__links p {
   display: block;
-  font-size: 14px;
+  font-size: 13px;
   color: rgba(255,255,255,0.5);
-  margin-bottom: 10px;
+  margin-bottom: 6px;
   transition: color 0.2s;
   cursor: pointer;
 }
@@ -1851,7 +1867,7 @@ export default {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 24px 0;
+  padding: 16px 0;
 }
 .me-footer__bottom p {
   font-size: 13px;
