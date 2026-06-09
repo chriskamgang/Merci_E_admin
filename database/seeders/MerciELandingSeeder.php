@@ -4,19 +4,17 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class MerciELandingSeeder extends Seeder
 {
-    /**
-     * Seeds all landing page tables with Merci E production data.
-     * Generated on 2026-06-09.
-     */
     public function run(): void
     {
+        DB::statement('SET FOREIGN_KEY_CHECKS=0;');
 
         // === SINGLE_LANDING_PAGE ===
-        DB::table('single_landing_page')->delete();
-        DB::table('single_landing_page')->insert(array (
+        DB::table('single_landing_page')->truncate();
+        DB::table('single_landing_page')->insert(array_merge(['id' => Str::uuid()], array (
   'hero_para' => 'Your ride in Bafoussam, fast and safe. Merci E — the smart taxi that takes you everywhere in the city.',
   'hero_img_1' => 'hero3.png',
   'hero_img_2' => 'herosec4.png',
@@ -109,8 +107,8 @@ class MerciELandingSeeder extends Seeder
   'direction' => 'ltr',
   'created_at' => NULL,
   'updated_at' => '2026-06-09 13:53:56',
-));
-        DB::table('single_landing_page')->insert(array (
+)));
+        DB::table('single_landing_page')->insert(array_merge(['id' => Str::uuid()], array (
   'hero_para' => 'Votre trajet à Bafoussam, rapide et en toute sécurité. Merci E — le taxi intelligent qui vous accompagne partout dans la ville.',
   'hero_img_1' => 'hero3.png',
   'hero_img_2' => 'herosec4.png',
@@ -203,11 +201,11 @@ class MerciELandingSeeder extends Seeder
   'direction' => 'ltr',
   'created_at' => NULL,
   'updated_at' => '2026-06-09 13:53:41',
-));
+)));
 
         // === SINGLE_LANDING_HEADERS ===
-        DB::table('single_landing_headers')->delete();
-        DB::table('single_landing_headers')->insert(array (
+        DB::table('single_landing_headers')->truncate();
+        DB::table('single_landing_headers')->insert(array_merge(['id' => Str::uuid()], array (
   'header_logo' => 'rest.png',
   'home' => 'Home',
   'aboutus' => 'About Us',
@@ -241,8 +239,8 @@ class MerciELandingSeeder extends Seeder
   'direction' => 'ltr',
   'created_at' => NULL,
   'updated_at' => NULL,
-));
-        DB::table('single_landing_headers')->insert(array (
+)));
+        DB::table('single_landing_headers')->insert(array_merge(['id' => Str::uuid()], array (
   'header_logo' => 'rest.png',
   'home' => 'Accueil',
   'aboutus' => 'À Propos',
@@ -276,11 +274,11 @@ class MerciELandingSeeder extends Seeder
   'direction' => 'ltr',
   'created_at' => NULL,
   'updated_at' => NULL,
-));
+)));
 
         // === LANDING_HOMES ===
-        DB::table('landing_homes')->delete();
-        DB::table('landing_homes')->insert(array (
+        DB::table('landing_homes')->truncate();
+        DB::table('landing_homes')->insert(array_merge(['id' => Str::uuid()], array (
   'hero_title' => 'It is a long established fact that a reader will be distracted by the readable content of a page when looking at its layout',
   'hero_user_link_android' => 'https://play.google.com/store/apps/details?id=cm.mercie.user',
   'hero_user_link_apple' => 'https://apps.apple.com/app/merci-e/id0000000000',
@@ -327,8 +325,8 @@ class MerciELandingSeeder extends Seeder
   'direction' => 'rtl',
   'created_at' => NULL,
   'updated_at' => NULL,
-));
-        DB::table('landing_homes')->insert(array (
+)));
+        DB::table('landing_homes')->insert(array_merge(['id' => Str::uuid()], array (
   'hero_title' => 'It is a long established fact that a reader will be distracted by the readable content of a page when looking at its layout!',
   'hero_user_link_android' => 'https://play.google.com/store/apps/details?id=cm.mercie.user',
   'hero_user_link_apple' => 'https://apps.apple.com/app/merci-e/id0000000000',
@@ -375,8 +373,8 @@ class MerciELandingSeeder extends Seeder
   'direction' => 'ltr',
   'created_at' => NULL,
   'updated_at' => NULL,
-));
-        DB::table('landing_homes')->insert(array (
+)));
+        DB::table('landing_homes')->insert(array_merge(['id' => Str::uuid()], array (
   'hero_title' => 'It is a long established fact that a reader will be distracted by the readable content of a page when looking at its layout!',
   'hero_user_link_android' => 'https://play.google.com/store/apps/details?id=cm.mercie.user',
   'hero_user_link_apple' => 'https://apps.apple.com/app/merci-e/id0000000000',
@@ -423,8 +421,8 @@ class MerciELandingSeeder extends Seeder
   'direction' => 'ltr',
   'created_at' => NULL,
   'updated_at' => NULL,
-));
-        DB::table('landing_homes')->insert(array (
+)));
+        DB::table('landing_homes')->insert(array_merge(['id' => Str::uuid()], array (
   'hero_title' => 'It is a long established fact that a reader will be distracted by the readable content of a page when looking at its layout',
   'hero_user_link_android' => 'https://play.google.com/store/apps/details?id=cm.mercie.user',
   'hero_user_link_apple' => 'https://apps.apple.com/app/merci-e/id0000000000',
@@ -471,11 +469,11 @@ class MerciELandingSeeder extends Seeder
   'direction' => 'ltr',
   'created_at' => NULL,
   'updated_at' => NULL,
-));
+)));
 
         // === LANDING_DRIVERS ===
-        DB::table('landing_drivers')->delete();
-        DB::table('landing_drivers')->insert(array (
+        DB::table('landing_drivers')->truncate();
+        DB::table('landing_drivers')->insert(array_merge(['id' => Str::uuid()], array (
   'hero_title' => 'Driver',
   'driver_heading_1' => 'Be Your Own Boss in Bafoussam',
   'driver_para' => 'Join Merci E and earn money driving on your own schedule. No boss, no constraints.',
@@ -525,8 +523,8 @@ class MerciELandingSeeder extends Seeder
   'direction' => 'ltr',
   'created_at' => NULL,
   'updated_at' => NULL,
-));
-        DB::table('landing_drivers')->insert(array (
+)));
+        DB::table('landing_drivers')->insert(array_merge(['id' => Str::uuid()], array (
   'hero_title' => 'Chauffeur',
   'driver_heading_1' => 'Soyez votre propre patron à Bafoussam',
   'driver_para' => 'Rejoignez Merci E et gagnez de l\'argent en conduisant selon vos propres horaires. Pas de patron, pas de contraintes.',
@@ -576,11 +574,11 @@ class MerciELandingSeeder extends Seeder
   'direction' => 'ltr',
   'created_at' => NULL,
   'updated_at' => NULL,
-));
+)));
 
         // === LANDING_ABOUTS ===
-        DB::table('landing_abouts')->delete();
-        DB::table('landing_abouts')->insert(array (
+        DB::table('landing_abouts')->truncate();
+        DB::table('landing_abouts')->insert(array_merge(['id' => Str::uuid()], array (
   'hero_title' => 'About Merci E',
   'about_heading' => 'ABOUT US',
   'about_title' => 'Our Mission in Bafoussam',
@@ -607,8 +605,8 @@ class MerciELandingSeeder extends Seeder
   'direction' => 'ltr',
   'created_at' => NULL,
   'updated_at' => '2026-06-09 11:07:52',
-));
-        DB::table('landing_abouts')->insert(array (
+)));
+        DB::table('landing_abouts')->insert(array_merge(['id' => Str::uuid()], array (
   'hero_title' => 'À Propos de Merci E',
   'about_heading' => 'À PROPOS',
   'about_title' => 'Notre Mission à Bafoussam',
@@ -635,11 +633,11 @@ class MerciELandingSeeder extends Seeder
   'direction' => 'ltr',
   'created_at' => NULL,
   'updated_at' => NULL,
-));
+)));
 
         // === LANDING_HEADERS ===
-        DB::table('landing_headers')->delete();
-        DB::table('landing_headers')->insert(array (
+        DB::table('landing_headers')->truncate();
+        DB::table('landing_headers')->insert(array_merge(['id' => Str::uuid()], array (
   'header_logo' => 'rest.png',
   'home' => 'Home',
   'aboutus' => 'About Us',
@@ -674,8 +672,8 @@ class MerciELandingSeeder extends Seeder
   'direction' => 'ltr',
   'created_at' => NULL,
   'updated_at' => NULL,
-));
-        DB::table('landing_headers')->insert(array (
+)));
+        DB::table('landing_headers')->insert(array_merge(['id' => Str::uuid()], array (
   'header_logo' => 'rest.png',
   'home' => 'Accueil',
   'aboutus' => 'À Propos',
@@ -710,11 +708,11 @@ class MerciELandingSeeder extends Seeder
   'direction' => 'ltr',
   'created_at' => NULL,
   'updated_at' => NULL,
-));
+)));
 
         // === LANDING_CONTACTS ===
-        DB::table('landing_contacts')->delete();
-        DB::table('landing_contacts')->insert(array (
+        DB::table('landing_contacts')->truncate();
+        DB::table('landing_contacts')->insert(array_merge(['id' => Str::uuid()], array (
   'hero_title' => 'Contact',
   'contact_heading' => 'Contact Us',
   'contact_para' => 'Have a question or need help? Send us a message and we will respond quickly.',
@@ -736,8 +734,8 @@ class MerciELandingSeeder extends Seeder
   'direction' => 'ltr',
   'created_at' => NULL,
   'updated_at' => NULL,
-));
-        DB::table('landing_contacts')->insert(array (
+)));
+        DB::table('landing_contacts')->insert(array_merge(['id' => Str::uuid()], array (
   'hero_title' => 'Contact',
   'contact_heading' => 'Contactez-Nous',
   'contact_para' => 'Vous avez une question ou besoin d\'aide ? Envoyez-nous un message et nous vous répondrons rapidement.',
@@ -759,11 +757,11 @@ class MerciELandingSeeder extends Seeder
   'direction' => 'ltr',
   'created_at' => NULL,
   'updated_at' => NULL,
-));
+)));
 
         // === LANDING_USERS ===
-        DB::table('landing_users')->delete();
-        DB::table('landing_users')->insert(array (
+        DB::table('landing_users')->truncate();
+        DB::table('landing_users')->insert(array_merge(['id' => Str::uuid()], array (
   'hero_title' => 'Utilisateur',
   'user_heading_1' => 'Votre Trajet, Votre Façon',
   'user_para' => 'Avec Merci E, réservez un taxi à Bafoussam en quelques secondes. Simple, rapide et sécurisé.',
@@ -800,8 +798,8 @@ class MerciELandingSeeder extends Seeder
   'direction' => 'ltr',
   'created_at' => NULL,
   'updated_at' => NULL,
-));
-        DB::table('landing_users')->insert(array (
+)));
+        DB::table('landing_users')->insert(array_merge(['id' => Str::uuid()], array (
   'hero_title' => 'User',
   'user_heading_1' => 'Your Ride, Your Way',
   'user_para' => 'With Merci E, book a taxi in Bafoussam in seconds. Simple, fast and secure.',
@@ -838,11 +836,11 @@ class MerciELandingSeeder extends Seeder
   'direction' => 'ltr',
   'created_at' => NULL,
   'updated_at' => NULL,
-));
+)));
 
         // === LANDING_QUICKLINKS ===
-        DB::table('landing_quicklinks')->delete();
-        DB::table('landing_quicklinks')->insert(array (
+        DB::table('landing_quicklinks')->truncate();
+        DB::table('landing_quicklinks')->insert(array_merge(['id' => Str::uuid()], array (
   'privacy_title' => 'Privacy Policy',
   'privacy' => '<h2>Privacy Policy</h2>
 <p><strong>Effective Date:</strong> January 1, 2025</p>
@@ -914,8 +912,8 @@ class MerciELandingSeeder extends Seeder
   'direction' => 'ltr',
   'created_at' => NULL,
   'updated_at' => NULL,
-));
-        DB::table('landing_quicklinks')->insert(array (
+)));
+        DB::table('landing_quicklinks')->insert(array_merge(['id' => Str::uuid()], array (
   'privacy_title' => 'Politique de Confidentialité',
   'privacy' => '<h2>Politique de Confidentialité</h2>
 <p><strong>Date d\'entrée en vigueur :</strong> 1er janvier 2025</p>
@@ -987,6 +985,8 @@ class MerciELandingSeeder extends Seeder
   'direction' => 'ltr',
   'created_at' => NULL,
   'updated_at' => NULL,
-));
+)));
+
+        DB::statement('SET FOREIGN_KEY_CHECKS=1;');
     }
 }

@@ -4,14 +4,16 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class SingleLandingSiteSeeder extends Seeder
 {
     public function run(): void
     {
-        DB::table('single_landing_page')->delete();
+        DB::statement('SET FOREIGN_KEY_CHECKS=0;');
+        DB::table('single_landing_page')->truncate();
 
-        DB::table('single_landing_page')->insert(array (
+        DB::table('single_landing_page')->insert(array_merge(['id' => Str::uuid()], array (
   'hero_para' => 'Your ride in Bafoussam, fast and safe. Merci E — the smart taxi that takes you everywhere in the city.',
   'hero_img_1' => 'hero3.png',
   'hero_img_2' => 'herosec4.png',
@@ -104,9 +106,9 @@ class SingleLandingSiteSeeder extends Seeder
   'direction' => 'ltr',
   'created_at' => NULL,
   'updated_at' => '2026-06-09 13:53:56',
-));
+)));
 
-        DB::table('single_landing_page')->insert(array (
+        DB::table('single_landing_page')->insert(array_merge(['id' => Str::uuid()], array (
   'hero_para' => 'Votre trajet à Bafoussam, rapide et en toute sécurité. Merci E — le taxi intelligent qui vous accompagne partout dans la ville.',
   'hero_img_1' => 'hero3.png',
   'hero_img_2' => 'herosec4.png',
@@ -199,7 +201,8 @@ class SingleLandingSiteSeeder extends Seeder
   'direction' => 'ltr',
   'created_at' => NULL,
   'updated_at' => '2026-06-09 13:53:41',
-));
+)));
 
+        DB::statement('SET FOREIGN_KEY_CHECKS=1;');
     }
 }
