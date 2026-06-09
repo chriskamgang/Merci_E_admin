@@ -1084,7 +1084,6 @@ export default {
   align-items: center;
   justify-content: space-between;
   height: 72px;
-  overflow: hidden;
 }
 .me-nav__logo {
   display: flex;
@@ -1181,7 +1180,7 @@ export default {
   box-shadow: 0 12px 40px rgba(0,0,0,0.12);
   min-width: 160px;
   padding: 8px;
-  z-index: 100;
+  z-index: 9999;
 }
 .me-lang-dropdown__item {
   display: flex;
