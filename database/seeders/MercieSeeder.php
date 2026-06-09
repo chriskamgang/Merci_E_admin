@@ -39,6 +39,7 @@ class MercieSeeder extends Seeder
         $defaults = [
             'default_country_code_for_mobile_app'  => 'CM',
             'default_currency_code_for_mobile_app' => 'XAF',
+            'enable_single_landing_page'           => '1',
         ];
 
         foreach ($defaults as $name => $value) {
