@@ -16,6 +16,9 @@ use Kreait\Firebase\Factory as Firebase;
 use App\Models\ThirdPartySetting;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\URL;
+use App\Models\Request\Request as TripRequest;
+use App\Models\Request\RequestBill;
+use App\Observers\PartnerRequestObserver;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -50,6 +53,10 @@ class AppServiceProvider extends ServiceProvider
         $this->loadCustomValidators();
 
         Paginator::useBootstrap();
+
+        // Outbound webhooks for integration partner accounts (config/partners.php).
+        TripRequest::observe(PartnerRequestObserver::class);
+        RequestBill::created(fn (RequestBill $bill) => app(PartnerRequestObserver::class)->billCreated($bill));
 
         if (Schema::hasTable('third_party_settings')) {
             $firebase_database_url = ThirdPartySetting::where('name','firebase_database_url')->pluck('value')->first();

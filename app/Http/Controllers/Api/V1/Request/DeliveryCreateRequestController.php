@@ -29,6 +29,8 @@ use App\Jobs\ValidateAndGeneratePeakZone;
 use App\Http\Controllers\Api\V1\Payment\Stripe\StripeController;
 use App\Models\Admin\Promo;
 use App\Models\Admin\FranchisePromo;
+use App\Services\Partners\PartnerRegistry;
+use App\Services\Partners\WaitingRequestCanceller;
 
 
 
@@ -90,6 +92,11 @@ class DeliveryCreateRequestController extends StripeController
         * send emails and sms & push notifications to the user& drivers as well.
         */
         // Check whether the trip is schedule ride or not
+        // Partner retry safety: the same external reference never creates a second active delivery.
+        if ($existing = $this->activePartnerRequest($request)) {
+            return $this->respondSuccess(fractal($existing, new TripRequestTransformer)->parseIncludes('userDetail'), 'request_already_exists');
+        }
+
         if ($request->has('is_later') && $request->is_later) {
             return $this->createRideLater($request);
         }
@@ -101,17 +108,8 @@ class DeliveryCreateRequestController extends StripeController
         // Validate payment option is available.
         // @TODO
         //Check if thge user created a trip and waiting for a driver to accept. if it is we need to cancel the exists trip and create new one
-        $request_meta_with_current_user = RequestMeta::where('user_id', auth()->user()->id);
-        $check_request_data_with_user = $request_meta_with_current_user->exists();
-        if ($check_request_data_with_user) {
-            // get request detail
-            $request_with_user = $request_meta_with_current_user->pluck('request_id')->first();
-            if ($request_with_user) {
-                $this->request->where('id', $request_with_user)->update(['is_cancelled'=>1,'cancel_method'=>1,'cancelled_at'=>date('Y-m-d H:i:s')]);
-            }
-            // Delete all meta details
-            $request_meta_with_current_user->delete();
-        }
+        // Integration partners (config/partners.php) keep several deliveries in parallel: skipped for them.
+        WaitingRequestCanceller::cancelPreviousFor(auth()->user());
         // get type id
         $zone_type_detail = ZoneType::where('id', $request->vehicle_type)->first();
         $type_id = $zone_type_detail->type_id;
@@ -267,6 +265,10 @@ class DeliveryCreateRequestController extends StripeController
         }
 
         $request_params['company_key'] = auth()->user()->company_key;
+        // Only set for partners, so normal requests never depend on the partner_reference migration.
+        if ($partner_reference = $this->partnerReference($request)) {
+            $request_params['partner_reference'] = $partner_reference;
+        }
 
         if($request->has('request_eta_amount') && $request->request_eta_amount){
 
@@ -464,6 +466,10 @@ class DeliveryCreateRequestController extends StripeController
         }
 
         $request_params['company_key'] = auth()->user()->company_key;
+        // Only set for partners, so normal requests never depend on the partner_reference migration.
+        if ($partner_reference = $this->partnerReference($request)) {
+            $request_params['partner_reference'] = $partner_reference;
+        }
         
         if($request->has('rental_pack_id') && $request->rental_pack_id){
 
@@ -572,5 +578,32 @@ class DeliveryCreateRequestController extends StripeController
             dispatch(new ValidateAndGeneratePeakZone($request->pick_lat,$request->pick_lng,$zone_type_detail->zone_id,$timezone));
         }
         return $this->respondSuccess($request_result,'created_request_successfully');
+    }
+
+    /**
+     * External reference (e.g. marketplace order id) — only kept for integration partner accounts.
+     */
+    private function partnerReference($request): ?string
+    {
+        if (! PartnerRegistry::isPartner(auth()->id())) {
+            return null;
+        }
+
+        $reference = trim((string) $request->input('partner_reference', ''));
+
+        return $reference === '' ? null : $reference;
+    }
+
+    /**
+     * A partner's still-active request carrying the same partner_reference, if any.
+     */
+    private function activePartnerRequest($request): ?Request
+    {
+        $reference = $this->partnerReference($request);
+        if ($reference === null) {
+            return null;
+        }
+
+        return PartnerRegistry::activeRequestFor(auth()->id(), $reference);
     }
 }

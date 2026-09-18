@@ -33,6 +33,8 @@ use App\Mail\RideLaterMail;
 use Illuminate\Support\Facades\Mail;
 use App\Http\Controllers\Api\V1\Payment\Stripe\StripeController;
 use App\Models\Admin\FranchisePromo;
+use App\Services\Partners\WaitingRequestCanceller;
+
 /**
  * @group User-trips-apis
  *
@@ -97,17 +99,8 @@ class CreateRequestController extends StripeController
         // Validate payment option is available.
         // @TODO
         //Check if thge user created a trip and waiting for a driver to accept. if it is we need to cancel the exists trip and create new one
-        $request_meta_with_current_user = RequestMeta::where('user_id', auth()->user()->id);
-        $check_request_data_with_user = $request_meta_with_current_user->exists();
-        if ($check_request_data_with_user) {
-            // get request detail
-            $request_with_user = $request_meta_with_current_user->pluck('request_id')->first();
-            if ($request_with_user) {
-                $this->request->where('id', $request_with_user)->update(['is_cancelled'=>1,'cancel_method'=>1,'cancelled_at'=>date('Y-m-d H:i:s')]);
-            }
-            // Delete all meta details
-            $request_meta_with_current_user->delete();
-        }
+        // Skipped for integration partners (config/partners.php).
+        WaitingRequestCanceller::cancelPreviousFor(auth()->user());
         // get type id
         $zone_type_detail = ZoneType::where('id', $request->vehicle_type)->first();
         $type_id = $zone_type_detail->type_id;

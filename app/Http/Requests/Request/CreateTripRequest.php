@@ -27,6 +27,8 @@ class CreateTripRequest extends BaseRequest
             'trip_start_time'=>'sometimes|required|date_format:Y-m-d H:i:s',
             // 'promocode_id'=>'sometimes|required|exists:promo,id',
             'transport_type'=>'sometimes|required',
+            // External reference of an integration partner (e.g. marketplace order id); ignored for other users.
+            'partner_reference'=>'sometimes|nullable|string|max:191',
         ];
     }
 }

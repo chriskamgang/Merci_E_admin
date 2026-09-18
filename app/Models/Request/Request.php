@@ -53,6 +53,7 @@ class Request extends Model
         'is_redeem', 'offerred_ride_fare', 'accepted_ride_fare', 'is_bid_ride', 'is_multiple_vehicles', 'no_of_vehicles', 'is_trip_meter',
         'is_my_rider', 'order_id', 'store_id', 'poly_line', 'assign_method', 'is_manual', 'is_airport', 'is_parcel', 'paid_at', 'booked_by',
         'parcel_type', 'is_surge_applied', 'completed_at', 'seats_taken', 'shared_ride', 'franchise_promo_id', 'franchise_owner_id', 'book_for_other_contact_name',
+        'partner_reference',
     ];
 
     /**
