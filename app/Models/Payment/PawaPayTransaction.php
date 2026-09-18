@@ -23,6 +23,7 @@ class PawaPayTransaction extends Model
         'status',           // pending | completed | failed
         'pawapay_status',   // raw status from PawaPay (ACCEPTED, COMPLETED, FAILED…)
         'failure_reason',
+        'external_id',
     ];
 
     public function user(): BelongsTo

@@ -526,7 +526,8 @@
       // Login with OTP
       async loginWithOTP() {
         try {
-          const response = await axios.post('/user/login', { mobile: this.phoneNumber });
+          // The server requires the verified OTP (single use) for passwordless login.
+          const response = await axios.post('/user/login', { mobile: this.phoneNumber, otp: this.verificationCode });
           if (response.data.success) {
             router.get('/create-booking');
           }

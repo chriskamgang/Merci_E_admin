@@ -7,7 +7,6 @@ use App\Http\Controllers\Api\V1\Auth\Password\PasswordResetController;
 use App\Http\Controllers\Api\V1\Auth\Registration\UserRegistrationController;
 use App\Http\Controllers\Api\V1\Auth\Registration\DriverSignupController;
 use App\Http\Controllers\Api\V1\Auth\Registration\ReferralController;
-use App\Http\Controllers\Api\V1\Auth\Registration\AdminRegistrationController;
 
 Route::middleware('throttle:120,1')->group(function () {
 
@@ -71,8 +70,9 @@ Route::middleware('throttle:120,1')->group(function () {
         // Validate registration OTP
         Route::post('user/register/validate-otp', [UserRegistrationController::class, 'validateOTP']);
 
-        // Admin Registration
-        Route::post('admin/register', [AdminRegistrationController::class, 'register']);
+        // Admin Registration: route removed (security). It was public and let anyone create
+        // an account with any role, including super-admin. Admins are created from the
+        // admin panel (authenticated web routes). Nothing in the panel or apps called it.
     });
 
     /**

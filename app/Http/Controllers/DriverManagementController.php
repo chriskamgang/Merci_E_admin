@@ -1433,24 +1433,49 @@ class DriverManagementController extends BaseController
     
         $wallet_withdrawal_request = WalletWithdrawalRequest::findOrFail($request->id);
     
-        if ($request->status === 'approved') {
-            // Handle approval logic
-            $driver_wallet = DriverWallet::firstOrCreate(['user_id' => $wallet_withdrawal_request->driver_id]);
-            $driver_wallet->amount_spent += $wallet_withdrawal_request->requested_amount;
-            $driver_wallet->amount_balance -= $wallet_withdrawal_request->requested_amount;
-            $driver_wallet->save();
+        // Claim the request atomically: only a still-REQUESTED (0) request can be approved or
+        // declined, exactly once (prevents double debit on double-click / parallel admins),
+        // and the debit happens under a wallet row lock with a balance re-check.
+        $transaction_id = str_random(6);
+        $claim = DB::transaction(function () use ($request, $transaction_id) {
+            $locked = WalletWithdrawalRequest::whereKey($request->id)->lockForUpdate()->first();
+            if (! $locked || (int) $locked->status !== 0) {
+                return 'This withdrawal request has already been processed.';
+            }
 
-             // Generate transaction_id
-                 $transaction_id = str_random(6); 
-    
-            $wallet_withdrawal_request->driverDetail->driverWalletHistory()->create([
-                'amount' => $wallet_withdrawal_request->requested_amount,
-                'transaction_id' => $transaction_id,
-                'remarks' => WalletRemarks::WITHDRAWN_FROM_WALLET,
-                'is_credit' => false,
-            ]);
-    
-            $wallet_withdrawal_request->status = 1; // Approved
+            if ($request->status === 'approved') {
+                $driver_wallet = \App\Services\WalletService::lockWallet(DriverWallet::class, $locked->driver_id);
+                if ($driver_wallet->amount_balance < $locked->requested_amount) {
+                    return 'Insufficient driver wallet balance for this withdrawal.';
+                }
+                $driver_wallet->amount_spent += $locked->requested_amount;
+                $driver_wallet->amount_balance -= $locked->requested_amount;
+                $driver_wallet->save();
+
+                DriverWalletHistory::create([
+                    'user_id' => $locked->driver_id,
+                    'amount' => $locked->requested_amount,
+                    'transaction_id' => $transaction_id,
+                    'remarks' => WalletRemarks::WITHDRAWN_FROM_WALLET,
+                    'is_credit' => false,
+                ]);
+                $locked->status = 1; // Approved
+            } else {
+                $locked->status = 2; // Declined
+            }
+            $locked->payment_status = $request->status;
+            $locked->save();
+
+            return $locked;
+        });
+
+        if (is_string($claim)) {
+            return response()->json(['message' => $claim], 422);
+        }
+        $wallet_withdrawal_request = $claim;
+
+        if ($request->status === 'approved') {
+            $driver_wallet = DriverWallet::where('user_id', $wallet_withdrawal_request->driver_id)->first();
 
             $user = $driver_wallet->driver->user;
             // $title = custom_trans('payment_credited',[],$user->lang);

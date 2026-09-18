@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Models\Setting;
 use App\Events\Event;
 use App\Models\MailOtp;
+use App\Base\Services\OTP\OtpVerifier;
 use Illuminate\Support\Str;
 use Illuminate\Http\Request;
 use App\Events\Auth\UserLogin;
@@ -228,59 +229,39 @@ class LoginController extends ApiController
      */
     protected function loginUserAccount($request, $role, $needsToken = true, array $conditions = [])
     {
-        // if ($needsToken && !$request->has(['client_id', 'client_secret'])) {
-        //     return $this->respondBadRequest('Missing password grant client credentials');
-        // }
-        if ($request->has('social_id')) {
-            return $this->setLoginIdentifier('social_id')
-                ->loginUserWithSocialUniqueId($request, $role, $needsToken, $conditions);
-        }
-
-        if ($request->has('uuid')) {
-
-            return $this->setLoginIdentifier('uuid')
-                ->loginUserWithUuid($request, $role, $needsToken, $conditions);
-        }
-
-        if ($needsToken && $request->has(['mobile', 'otp']) && $this->roleAllowedOTPLogin($role)) {
-            return $this->loginUserWithOTP($request, $role, $needsToken, $conditions);
-        }
+        // SECURITY: the former `social_id`, `social_unique_id` and `uuid` branches issued a
+        // session/token from an identifier alone (no provider token, no OTP), and the
+        // `mobile`-only branch did the same from a phone number. They have been removed.
+        // No first-party client (user app, driver app, web portal) uses social/uuid login.
 
         if ($request->has(['mobile', 'password'])) {
             return $this->setLoginIdentifier('mobile')
                 ->loginUserWithPassword($request, $role, $needsToken, $conditions);
         }
 
-        if ($request->has(['mobile'])) {
-            return $this->setLoginIdentifier('mobile')
-                ->loginUserWithMobile($request, $role, $needsToken, $conditions);
-        }
-
         if ($request->has(['email', 'password'])) {
-
-            // dd($request->all());
-
             return $this->setLoginIdentifier('email')
                 ->loginUserWithPassword($request, $role, $needsToken, $conditions);
         }
-
-        if ($request->has('social_unique_id')) {
-            return $this->setLoginIdentifier('social_unique_id')
-                ->loginUserWithSocialUniqueId($request, $role, $needsToken, $conditions);
-        }
-
-        
 
         if ($request->has(['username', 'password']) && $this->roleAllowedUsernameLogin($role)) {
             return $this->setLoginIdentifier('username')
                 ->loginUserWithPassword($request, $role, $needsToken, $conditions);
         }
 
-        
-        if ($needsToken && $request->has(['email', 'otp']) && $this->roleAllowedOTPLogin($role)) {
-            return $this->loginUserWithEmailOtp($request, $role, $needsToken, $conditions);
-        }
+        // Passwordless (OTP) login is only allowed for app roles (user/driver/owner),
+        // never for admin-panel roles, which always need a password.
+        if ($this->roleAllowedOTPLogin($role)) {
+            if ($request->filled('mobile')) {
+                return $this->setLoginIdentifier('mobile')
+                    ->loginUserWithOTP($request, $role, $needsToken, $conditions);
+            }
 
+            if ($request->has(['email', 'otp'])) {
+                return $this->setLoginIdentifier('email')
+                    ->loginUserWithEmailOtp($request, $role, $needsToken, $conditions);
+            }
+        }
 
         return $this->respondBadRequest('Missing login credentials');
     }
@@ -297,108 +278,27 @@ class LoginController extends ApiController
      */
     protected function loginUserWithEmailOtp($request, $role, $needsToken = true, array $conditions = [])
     {
-
-
-        $request->validate([
-        'otp' => 'sometimes|required|exists:mail_otp_verifications,otp',
-        ]);
-
         $email = $request->input('email');
-        $otp = $request->input('otp');
-        $user = null;
+        $otp = (string) $request->input('otp');
         $identifier = $this->getLoginIdentifier();
 
+        $user = $this->resolveUserFromEmail($email, $role);
 
-
-        $verify_otp = MailOtp::where('email' ,$email)->where('otp', $otp)->exists();
-            // dd($verify_otp);
-
-
-        if ($verify_otp == false) 
-        {
-            $this->throwCustomValidationException(['message' => "The otp provided has Invaild" ]);
-        }
-       
-       if (method_exists($this, $method = 'resolveUserFrom' . Str::studly($identifier))) {
-
-            $user = $this->{$method}($email, $role);
-           
-        }
-
-        if (!$user) {
+        if (! $user) {
             $this->throwInvalidCredentialsException($identifier);
         }
 
-        MailOtp::where('email' ,$email)->where('otp', $otp)->update(['verified' => true]);
-
-        return $this->authenticateAndRespond($user, $request, $needsToken);
-
-    }
-    /**
-     * Login the user using their email and password.
-     *
-     * @param \Illuminate\Foundation\Http\FormRequest $request
-     * @param string|array $role
-     * @param bool $needsToken
-     * @param array $conditions
-     * @return \Illuminate\Http\JsonResponse
-     */
-    protected function loginUserWithMobile($request, $role, $needsToken = true, array $conditions = [])
-    {
-        $user = null;
-
-        $identifier = $this->getLoginIdentifier();
-
-        $emailOrUsername = $request->input($identifier);
-
-        if (method_exists($this, $method = 'resolveUserFrom' . Str::studly($identifier))) {
-            $user = $this->{$method}($emailOrUsername, $role);
-        }
-
-        if (!$user) {
-            $this->throwInvalidCredentialsException($identifier);
-        }
-
-        if (!$user->isActive() || !$this->validateChecks($user, $conditions, $identifier)) {
+        if (! $user->isActive() || ! $this->validateChecks($user, $conditions, $identifier)) {
             $this->throwAccountDisabledException($identifier);
         }
 
-        return $this->authenticateAndRespond($user, $request, $needsToken);
-    }
-
-
-    /**
-     * Login the user using their email and password.
-     *
-     * @param \Illuminate\Foundation\Http\FormRequest $request
-     * @param string|array $role
-     * @param bool $needsToken
-     * @param array $conditions
-     * @return \Illuminate\Http\JsonResponse
-     */
-    protected function loginUserWithUuid($request, $role, $needsToken = true, array $conditions = [])
-    {
-        $user = null;
-
-        $identifier = $this->getLoginIdentifier();
-
-        $emailOrUsername = $request->input($identifier);
-
-        if (method_exists($this, $method = 'resolveUserFrom' . Str::studly($identifier))) {
-            $user = $this->{$method}($emailOrUsername, $role);
-        }
-
-        if (!$user) {
-            $this->throwInvalidCredentialsException($identifier);
-        }
-
-        if (!$user->isActive() || !$this->validateChecks($user, $conditions, $identifier)) {
-            $this->throwAccountDisabledException($identifier);
+        // Verified, unexpired, single-use OTP bound to this email.
+        if (! OtpVerifier::consumeEmailOtp($email, $otp)) {
+            $this->throwCustomValidationException(['message' => 'The otp provided is invalid or has expired.']);
         }
 
         return $this->authenticateAndRespond($user, $request, $needsToken);
     }
-
 
     /**
      * Login the user using their email and password.
@@ -444,36 +344,6 @@ class LoginController extends ApiController
 
 
     /**
-     * Login the user using social unique id
-     *
-     * @param \Illuminate\Foundation\Http\FormRequest $request
-     * @param string|array $role
-     * @param bool $needsToken
-     * @param array $conditions
-     * @return \Illuminate\Http\JsonResponse
-     */
-    protected function loginUserWithSocialUniqueId($request, $role, $needsToken = true, array $conditions = [])
-    {
-        $user = null;
-        $identifier = $this->getLoginIdentifier();
-        $social_unique_id = $request->input($identifier);
-
-        if (method_exists($this, $method = 'resolveUserFrom' . Str::studly($identifier))) {
-            $user = $this->{$method}($social_unique_id, $role);
-        }
-
-        if (!$user) {
-            $this->throwInvalidCredentialsException($identifier);
-        }
-
-        if (!$user->isActive() || !$this->validateChecks($user, $conditions, $identifier)) {
-            $this->throwAccountDisabledException($identifier);
-        }
-
-        return $this->authenticateAndRespond($user, $request, $needsToken);
-    }
-
-    /**
      * Login the user using their mobile and otp.
      *
      * @param \Illuminate\Foundation\Http\FormRequest $request
@@ -484,24 +354,30 @@ class LoginController extends ApiController
      */
     protected function loginUserWithOTP($request, $role, $needsToken = true, array $conditions = [])
     {
-        $mobile = $request->input('mobile');
-        $otp = $request->input('otp');
+        $mobile = (string) $request->input('mobile');
+        $otp = $request->filled('otp') ? (string) $request->input('otp') : null;
 
         $user = $this->resolveUserFromMobile($mobile, $role);
 
-        if (!$user) {
-            $this->throwCustomValidationException("User with that mobile number doesn't exist.", 'otp');
+        if (! $user) {
+            $this->throwInvalidCredentialsException('mobile');
         }
 
-        if (!$this->otpHandler->setMobile($mobile)->validate($otp)) {
-            $this->throwCustomValidationException('The otp provided is invalid.', 'otp');
-        }
-
-        if (!$user->isActive() || !$this->validateChecks($user, $conditions, 'otp')) {
+        if (! $user->isActive() || ! $this->validateChecks($user, $conditions, 'otp')) {
             $this->throwAccountDisabledException('otp');
         }
 
-        $this->otpHandler->delete();
+        // Temporary compatibility for app builds released before the client started sending
+        // `otp` with the login call: when explicitly enabled, a code that was already verified
+        // through /api/v1/validate-otp (and is still unexpired) is accepted and consumed.
+        if ($otp === null && ! config('auth.legacy_mobile_login_without_otp')) {
+            $this->throwCustomValidationException('The otp field is required.', 'otp');
+        }
+
+        // Verified, unexpired, single-use OTP bound to this mobile number.
+        if (! OtpVerifier::consumeMobileOtp($mobile, $otp)) {
+            $this->throwCustomValidationException('The otp provided is invalid or has expired.', 'otp');
+        }
 
         return $this->authenticateAndRespond($user, $request, $needsToken);
     }
@@ -581,24 +457,6 @@ class LoginController extends ApiController
             ->first();
     }
 
-    /**
-     * Resolve the user from their mobile for a particular role.
-     *
-     * @param string $mobile
-     * @param string|array $role
-     * @return \App\Models\User|null
-     */
-    protected function resolveUserFromUuid($uuid, $role)
-    {
-        
-        $mobile = $this->otpHandler->getMobileFromUuid($uuid);
-
-        // dd($mobile);
-        
-        return $this->user->belongsToRole($role)
-            ->where('mobile', $mobile)
-            ->first();
-    }
     /**
      * Validate the user model conditions.
      *

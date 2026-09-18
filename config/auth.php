@@ -112,4 +112,19 @@ return [
 
     'password_timeout' => 10800,
 
+    /*
+    |--------------------------------------------------------------------------
+    | Legacy mobile OTP login (temporary)
+    |--------------------------------------------------------------------------
+    |
+    | Mobile OTP login requires the `otp` field on /api/v1/{user,driver}/login.
+    | App builds released before that change send only `mobile` after calling
+    | /api/v1/validate-otp. Set this to true ONLY as a short migration window:
+    | a login without `otp` is then accepted if an unexpired, already verified
+    | code exists for that mobile (it is consumed on use).
+    |
+    */
+
+    'legacy_mobile_login_without_otp' => (bool) env('AUTH_LEGACY_MOBILE_LOGIN_WITHOUT_OTP', false),
+
 ];

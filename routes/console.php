@@ -51,3 +51,10 @@ Schedule::command('cancel:request')
 
 Schedule::command('promotion:deactivate-expired')
     ->everyMinute();
+
+// KPay: settle pending mobile-money deposits / payouts (credits & refunds are
+// idempotent — see App\Services\WalletService). Requires a running queue worker
+// (QUEUE_CONNECTION=database): the scheduler only dispatches the job.
+Schedule::job(new \App\Jobs\KPayPollPendingTransactions)
+    ->everyMinute()
+    ->withoutOverlapping();

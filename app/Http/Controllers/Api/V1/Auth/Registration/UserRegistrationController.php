@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1\Auth\Registration;
 use DB;
 use Twilio;
 use App\Models\User;
+use App\Base\Services\OTP\OtpVerifier;
 use App\Models\Country;
 use Illuminate\Http\Request;
 use App\Events\Auth\UserLogin;
@@ -665,36 +666,49 @@ class UserRegistrationController extends LoginController
      * @response {"success":true,"message":"password_updated_successfuly"}
      */
     public function updatePassword(Request $request)
-{
- 
-    $user = User::whereHas('roles', function ($q) {
-            $q->where('slug', Role::USER); // OR ->where('id', Role::USER)
-        })
-        ->where(function ($q) use ($request) {
-            if ($request->filled('email')) {
-                $q->where('email', $request->email);
-            }
+    {
+        $request->validate([
+            'email' => 'required_without:mobile|nullable|email',
+            'mobile' => 'required_without:email|nullable|string',
+            'otp' => 'required|string',
+            'password' => 'required|string|min:6',
+        ]);
 
-            if ($request->filled('mobile')) {
-                $q->where('mobile', $request->mobile);
-            }
-        })
-        ->first();
+        // Identify the account by exactly one identifier; never run an unfiltered query.
+        $byEmail = $request->filled('email') && ! $request->filled('mobile');
+        $identifier = $byEmail ? (string) $request->input('email') : (string) $request->input('mobile');
 
-    if (!$user) {
+        $user = User::belongsToRole(Role::USER)
+            ->where($byEmail ? 'email' : 'mobile', $identifier)
+            ->first();
+
+        if (! $user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'User not found',
+            ], 404);
+        }
+
+        // Proof of ownership: verified, unexpired, single-use OTP sent to that email/mobile.
+        $otp = (string) $request->input('otp');
+        $verified = $byEmail
+            ? OtpVerifier::consumeEmailOtp($identifier, $otp)
+            : OtpVerifier::consumeMobileOtp($identifier, $otp);
+
+        if (! $verified) {
+            $this->throwCustomValidationException('The otp provided is invalid or has expired.', 'otp');
+        }
+
+        $user->update([
+            'password' => Hash::make($request->password),
+        ]);
+
+        // Invalidate existing API tokens after a password reset.
+        $user->tokens()->delete();
+
         return response()->json([
-            'success' => false,
-            'message' => 'User not found'
-        ], 404);
+            'success' => true,
+            'message' => 'Password updated successfully',
+        ]);
     }
-
-    $user->update([
-        'password' => Hash::make($request->password)
-    ]);
-
-    return response()->json([
-        'success' => true,
-        'message' => 'Password updated successfully'
-    ]);
-}
 }

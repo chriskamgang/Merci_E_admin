@@ -20,13 +20,13 @@ class PaymentGatewayController extends Controller
         // dd($settings);
         // Transform settings into a structured object
         $formattedSettings = [
-            // PawaPay
-            'enable_pawapay'           => filter_var($settings['enable_pawapay'] ?? false, FILTER_VALIDATE_BOOLEAN),
-            'pawapay_environment'       => $settings['pawapay_environment'] ?? 'sandbox',
-            'pawapay_sandbox_token'     => $settings['pawapay_sandbox_token'] ?? '',
-            'pawapay_live_token'        => $settings['pawapay_live_token'] ?? '',
-            'pawapay_deposit_callback'  => url('api/v1/payment/pawapay/callback/deposit'),
-            'pawapay_payout_callback'   => url('api/v1/payment/pawapay/callback/payout'),
+            // KPay
+            'enable_kpay'              => filter_var($settings['enable_kpay'] ?? false, FILTER_VALIDATE_BOOLEAN),
+            'kpay_environment'         => $settings['kpay_environment'] ?? 'test',
+            'kpay_test_api_key'        => $settings['kpay_test_api_key'] ?? '',
+            'kpay_test_secret_key'     => $settings['kpay_test_secret_key'] ?? '',
+            'kpay_live_api_key'        => $settings['kpay_live_api_key'] ?? '',
+            'kpay_live_secret_key'     => $settings['kpay_live_secret_key'] ?? '',
 
             // GFSolutions
             'enable_gfsolutions'        => filter_var($settings['enable_gfsolutions'] ?? false, FILTER_VALIDATE_BOOLEAN),
@@ -158,11 +158,13 @@ class PaymentGatewayController extends Controller
     {
         // dd($request->all());
         $settings = $request->validate([
-            // PawaPay (primary gateway)
-            'enable_pawapay'       => 'required',
-            'pawapay_environment'  => 'required|in:sandbox,live',
-            'pawapay_sandbox_token'=> 'sometimes|nullable',
-            'pawapay_live_token'   => 'sometimes|nullable',
+            // KPay (primary gateway)
+            'enable_kpay'            => 'required',
+            'kpay_environment'       => 'required|in:test,live',
+            'kpay_test_api_key'      => 'sometimes|nullable',
+            'kpay_test_secret_key'   => 'sometimes|nullable',
+            'kpay_live_api_key'      => 'sometimes|nullable',
+            'kpay_live_secret_key'   => 'sometimes|nullable',
 
             // GFSolutions
             'enable_gfsolutions'     => 'sometimes',
@@ -281,18 +283,17 @@ class PaymentGatewayController extends Controller
             $this->updateEnvFile($paypal_settings);
         }
 
-        // Sync PawaPay token and base URL to .env
-        $activeToken = $request->pawapay_environment === 'live'
-            ? $request->pawapay_live_token
-            : $request->pawapay_sandbox_token;
-
-        $pawapay_base_url = $request->pawapay_environment === 'live'
-            ? 'https://api.pawapay.io'
-            : 'https://api.sandbox.pawapay.io';
+        // Sync KPay keys to .env based on selected environment
+        $kpayApiKey    = $request->kpay_environment === 'live'
+            ? $request->kpay_live_api_key
+            : $request->kpay_test_api_key;
+        $kpaySecretKey = $request->kpay_environment === 'live'
+            ? $request->kpay_live_secret_key
+            : $request->kpay_test_secret_key;
 
         $this->updateEnvFile([
-            'PAWAPAY_API_TOKEN' => $activeToken ?? '',
-            'PAWAPAY_BASE_URL'  => $pawapay_base_url,
+            'KPAY_API_KEY'    => $kpayApiKey ?? '',
+            'KPAY_SECRET_KEY' => $kpaySecretKey ?? '',
         ]);
 
 
@@ -305,7 +306,7 @@ class PaymentGatewayController extends Controller
             ]);
         }
 
-        $skipKeys = ['pawapay_deposit_callback', 'pawapay_payout_callback', 'gfsolutions_callback_url'];
+        $skipKeys = ['gfsolutions_callback_url'];
 
         foreach ($settings as $key => $setting) {
             if (in_array($key, $skipKeys)) continue;

@@ -1,0 +1,117 @@
+// PROPOSED Realtime Database rules for project mercie-app — NOT DEPLOYED.
+//
+// PREREQUISITE (none of this exists today): every RTDB client must be signed in to
+// Firebase Auth with a CUSTOM TOKEN minted by the Laravel backend (Kreait Admin SDK
+// ->createCustomToken()) right after its normal API login, with:
+//   passenger app : uid = "user_<users.id>"     claims { role: "user" }
+//   driver app    : uid = "driver_<drivers.id>" claims { role: "driver" }
+//   admin/dispatch web panel (browser JS SDK) : uid = "staff_<users.id>" claims { role: "staff" }
+// and the apps / web panel must call signInWithCustomToken(token).
+// The Laravel backend uses the Admin SDK (service account) which BYPASSES these rules.
+// RTDB rules accept // comments; keep this file out of `firebase deploy` until the above ships.
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+
+    // Feature flag the driver app reads BEFORE login (Firebase-phone-OTP toggle). Public read-only.
+    "call_FB_OTP": { ".read": true, ".write": false },
+
+    "drivers": {
+      // Passenger app runs a geohash query (orderByChild('g')) over the whole node to show nearby
+      // cars and ETA; the web dispatcher maps read it too. Any signed-in client may read.
+      ".read": "auth != null",
+      ".indexOn": ["g", "id", "is_active", "is_available", "ownerid", "service_location_id"],
+      "$driverKey": {
+        // Only the driver itself writes its own node (location, availability, shared_ride...).
+        ".write": "auth != null && auth.uid === $driverKey"
+      }
+    },
+
+    "requests": {
+      // Web dispatch lists/filters all requests.
+      ".read": "auth != null && auth.token.role === 'staff'",
+      "$requestId": {
+        // Passenger who owns the ride, the driver it is assigned/offered to, or staff.
+        // NOTE: the backend currently does NOT write driver_id into requests/<id>; add it on accept
+        // (RequestAcceptRejectController) so the "data.child('driver_id')" branch works after
+        // request-meta/<id> is removed.
+        ".read": "auth != null && (auth.token.role === 'staff' || auth.uid === 'user_' + data.child('user_id').val() || auth.uid === 'driver_' + data.child('driver_id').val() || auth.uid === 'driver_' + root.child('request-meta/' + $requestId + '/driver_id').val())",
+        // Participants update live trip state (user: cancelled_by_user, message_by_user, driver_tips,
+        // payment_method...; driver: trip_distance, lat_lng_array, waiting times, is_user_paid...).
+        // Clients may only update an EXISTING node (created by the backend).
+        ".write": "auth != null && data.exists() && newData.exists() && (auth.token.role === 'staff' || auth.uid === 'user_' + data.child('user_id').val() || auth.uid === 'driver_' + data.child('driver_id').val() || auth.uid === 'driver_' + root.child('request-meta/' + $requestId + '/driver_id').val())",
+        // Ownership fields are immutable from clients.
+        "user_id": { ".validate": "!data.exists() || newData.val() == data.val()" },
+        "driver_id": { ".validate": "!data.exists() || newData.val() == data.val()" }
+        // SECURITY NOTE: money-ish flags here (is_payment_received, is_user_paid, driver_tips,
+        // additional_charges_amount, payment_method) are client-writable by design of the apps;
+        // the backend must never trust them for settlement — always recompute from SQL.
+      }
+    },
+
+    "request-meta": {
+      // Driver app listens with orderByChild('driver_id').equalTo(<own drivers.id>) on the whole node.
+      ".read": "auth != null && (auth.token.role === 'staff' || (query.orderByChild === 'driver_id' && auth.uid === 'driver_' + query.equalTo))",
+      ".indexOn": ["driver_id", "user_id"],
+      "$requestId": {
+        // Passenger app listens on request-meta/<its request id>.
+        ".read": "auth != null && (auth.uid === 'user_' + data.child('user_id').val() || auth.uid === 'driver_' + data.child('driver_id').val())",
+        // Written only by the backend (Admin SDK).
+        ".write": false
+      }
+    },
+
+    "bid-meta": {
+      // Drivers discover nearby bidding rides with a geohash query over the whole node.
+      ".read": "auth != null && (auth.token.role === 'driver' || auth.token.role === 'staff')",
+      ".indexOn": ["g"],
+      "$requestId": {
+        // Passenger creates/updates/removes its own bid node (the user app writes user_id as a string).
+        ".read": "auth != null && auth.uid === 'user_' + data.child('user_id').val()",
+        ".write": "auth != null && ((!data.exists() && auth.uid === 'user_' + newData.child('user_id').val()) || (data.exists() && auth.uid === 'user_' + data.child('user_id').val()))",
+        "drivers": {
+          "$driverKey": {
+            // A driver may only place / update / withdraw its OWN bid;
+            // the passenger may reject it (writes is_rejected) via the parent rule above.
+            ".write": "auth != null && auth.uid === $driverKey"
+          }
+        }
+      }
+    },
+
+    "peak-zones": {
+      ".read": "auth != null",
+      ".write": false
+    },
+
+    "conversation": {
+      // Admin<->user support chat. Backend writes; web panel reads the whole node.
+      ".read": "auth != null && auth.token.role === 'staff'",
+      "$conversationId": {
+        // Passenger app listens on conversation/<chatId>. Conversation ids must be unguessable
+        // (UUIDs); ideally the backend also stores user_id on the node and this becomes
+        // "auth.uid === 'user_' + data.child('user_id').val()".
+        ".read": "auth != null",
+        ".write": false
+      }
+    },
+
+    "SOS": {
+      ".read": "auth != null && auth.token.role === 'staff'",
+      "$requestId": {
+        // Only the passenger of that ride can raise an SOS for it.
+        ".write": "auth != null && auth.uid === 'user_' + root.child('requests/' + $requestId + '/user_id').val()"
+      }
+    },
+
+    "admin-notification": {
+      // Web panel reads, marks read (update {read:true}) and deletes notifications.
+      ".read": "auth != null && auth.token.role === 'staff'",
+      ".write": "auth != null && auth.token.role === 'staff'"
+    },
+
+    "owners": { ".read": false, ".write": false },
+    "franchise_owners": { ".read": false, ".write": false }
+  }
+}

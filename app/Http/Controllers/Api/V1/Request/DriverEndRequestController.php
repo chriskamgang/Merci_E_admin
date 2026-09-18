@@ -690,10 +690,10 @@ $bill->save();
                 'ride_otp'=>'required'
             ]);
 
-            $request_detail = RequestRequest::where('id', $request->input('request_id'))->first();
-            
+            $request_detail = RequestRequest::where('id', $request->input('request_id'))->where('driver_id', optional(auth()->user()->driver)->id)->first();
+
             if(!$request_detail){
-                $this->throwAuthorizationException();
+                return $this->respondNotFound('request_not_found');
             }
 
             if($request_detail->ride_otp != $request->ride_otp){
@@ -714,6 +714,10 @@ $bill->save();
 
         if(!$request_stop || !$request_stop->request()->exists()){
             $this->throwAuthorizationException();
+        }
+
+        if ($request_stop->request->driver_id != optional(auth()->user()->driver)->id) {
+            return $this->respondNotFound('request_not_found');
         }
 
         if($request_stop->request->ride_otp != $request->ride_otp){
@@ -742,10 +746,14 @@ $bill->save();
     public function tripMeterRideUpdate(Request $request) {
         $request->validate([
             'request_id' =>  'required',
-            'fare_amount' =>  'required',
+            'fare_amount' =>  'required|numeric|min:0',
         ]);
 
-        $request_detail = RequestRequest::where('id', $request->input('request_id'))->first();
+        $request_detail = RequestRequest::where('id', $request->input('request_id'))->where('driver_id', optional(auth()->user()->driver)->id)->first();
+
+        if (!$request_detail) {
+            return $this->respondNotFound('request_not_found');
+        }
 
         $request_detail->update(['is_trip_meter'=>true,'accepted_ride_fare'=>$request->fare_amount]);
         return $this->respondSuccess();
@@ -764,10 +772,14 @@ $bill->save();
         $request->validate([
             'request_id' =>  'required',
             'additional_charges_reason' =>  'required|string',
-            'additional_charges_amount' =>  'required',
+            'additional_charges_amount' =>  'required|numeric|min:0',
         ]);
 
-        $request_detail = RequestRequest::where('id', $request->input('request_id'))->first();
+        $request_detail = RequestRequest::where('id', $request->input('request_id'))->where('driver_id', optional(auth()->user()->driver)->id)->first();
+
+        if (!$request_detail) {
+            return $this->respondNotFound('request_not_found');
+        }
         $this->database->getReference('requests/'.$request_detail->id)->update(['additional_charges_reason'=>$request->additional_charges_reason,'additional_charges_amount'=>$request->additional_charges_amount]);
         $request_detail->update(['additional_charges_reason'=>$request->additional_charges_reason,'additional_charges_amount'=>$request->additional_charges_amount]);
         return $this->respondSuccess();

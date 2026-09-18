@@ -8,7 +8,7 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\V1\Payment\PaymentController;
-use App\Http\Controllers\Api\V1\Payment\PawaPayController;
+use App\Http\Controllers\Api\V1\Payment\KPayController;
 use App\Http\Controllers\Api\V1\Payment\GFSolutionsController;
 
 /*
@@ -28,14 +28,13 @@ Route::prefix('payment')
             Route::post('convert-point-to-wallet', [PaymentController::class, 'transferCreditFromPoints']);
         });
 
-        // PawaPay — deposits (recharge)
-        Route::prefix('pawapay')->group(function () {
-            Route::post('deposit', [PawaPayController::class, 'initiateDeposit']);
-            Route::get('deposit/{depositId}/status', [PawaPayController::class, 'depositStatus']);
+        // KPay — deposits (recharge) & withdrawals
+        Route::prefix('kpay')->group(function () {
+            Route::post('deposit', [KPayController::class, 'initiateDeposit']);
+            Route::get('deposit/{depositId}/status', [KPayController::class, 'depositStatus']);
 
-            // Payouts (driver withdrawal)
-            Route::post('payout', [PawaPayController::class, 'initiatePayout']);
-            Route::get('payout/{payoutId}/status', [PawaPayController::class, 'payoutStatus']);
+            Route::post('withdraw', [KPayController::class, 'initiateWithdrawal']);
+            Route::get('withdraw/{withdrawalId}/status', [KPayController::class, 'withdrawalStatus']);
         });
 
         // GFSolutions — deposits (recharge via payment page)
@@ -44,16 +43,6 @@ Route::prefix('payment')
             Route::get('deposit/{orderId}/status', [GFSolutionsController::class, 'depositStatus']);
         });
     });
-
-/*
-|--------------------------------------------------------------------------
-| Public routes — PawaPay callbacks (called by PawaPay servers)
-|--------------------------------------------------------------------------
-*/
-Route::prefix('payment/pawapay')->group(function () {
-    Route::post('callback/deposit', [PawaPayController::class, 'depositCallback']);
-    Route::post('callback/payout', [PawaPayController::class, 'payoutCallback']);
-});
 
 /*
 |--------------------------------------------------------------------------

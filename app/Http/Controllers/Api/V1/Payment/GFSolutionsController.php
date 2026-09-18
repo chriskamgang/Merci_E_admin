@@ -8,12 +8,8 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
 use App\Http\Controllers\Api\V1\BaseController;
 use App\Services\GFSolutionsService;
+use App\Services\WalletService;
 use App\Models\Payment\PawaPayTransaction;
-use App\Models\Payment\UserWallet;
-use App\Models\Payment\DriverWallet;
-use App\Models\Payment\UserWalletHistory;
-use App\Models\Payment\DriverWalletHistory;
-use App\Base\Constants\Masters\WalletRemarks;
 use App\Jobs\Notifications\SendPushNotification;
 
 /**
@@ -115,38 +111,62 @@ class GFSolutionsController extends BaseController
     {
         Log::info('GFSolutions callback received', $request->all());
 
-        $signature  = $request->header('x-gfs-signature', '');
-        $paymentRef = $request->input('paymentRef', '');
+        $signature  = (string) $request->header('x-gfs-signature', '');
+        $paymentRef = (string) $request->input('paymentRef', '');
         $amount     = $request->input('amount', 0);
-        $orderId    = $request->input('orderId', '');
-        $status     = $request->input('status', '');
+        $orderId    = (string) $request->input('orderId', '');
+        $status     = (string) $request->input('status', '');
 
-        // Verify signature
-        if ($signature && !$this->gfs->verifySignature($signature, $paymentRef, $amount, $orderId)) {
-            Log::warning('GFSolutions: invalid signature', [
-                'expected_order' => $orderId,
-                'signature'      => $signature,
+        // Signature is mandatory: a missing header is treated exactly like a bad one.
+        if ($signature === '' || ! $this->gfs->verifySignature($signature, $paymentRef, $amount, $orderId)) {
+            Log::warning('GFSolutions: missing or invalid signature', [
+                'order_id'      => $orderId,
+                'has_signature' => $signature !== '',
             ]);
+
             return response()->json(['error' => 'Invalid signature'], 401);
         }
 
         $tx = PawaPayTransaction::where('transaction_id', $orderId)
             ->where('type', 'deposit')
-            ->where('status', 'pending')
+            ->where('provider', 'GFSOLUTIONS')
             ->first();
 
-        if (!$tx) {
+        // Unknown order, or already settled (retry / duplicate callback): acknowledge, do nothing.
+        if (! $tx || $tx->status !== 'pending') {
             return response()->json(['received' => true]);
         }
 
-        if ($status === 'COMPLETED') {
-            $this->creditWallet($tx);
-        } else {
-            $tx->update([
-                'status'         => 'failed',
-                'pawapay_status' => $status,
-                'failure_reason' => json_encode($request->all()),
+        // WalletService performs the pending -> completed/failed transition under a row lock
+        // and re-checks status=pending, so retried or concurrent callbacks credit at most once.
+        if ($status !== 'COMPLETED') {
+            WalletService::failTransaction($tx, $status, $request->all());
+
+            return response()->json(['received' => true]);
+        }
+
+        // The stored amount is the one we asked GFSolutions to collect; never credit anything else.
+        if (! $this->amountMatches($tx->amount, $amount)) {
+            Log::warning('GFSolutions: callback amount does not match stored transaction', [
+                'order_id' => $orderId,
+                'expected' => $tx->amount,
+                'received' => $amount,
             ]);
+
+            WalletService::failTransaction($tx, 'AMOUNT_MISMATCH', [
+                'reason'   => 'amount_mismatch',
+                'expected' => $tx->amount,
+                'callback' => $request->all(),
+            ]);
+
+            return response()->json(['received' => true]);
+        }
+
+        $credited = WalletService::completeDeposit($tx, 'COMPLETED');
+
+        if ($credited) {
+            // Outside the DB transaction: a push failure must never roll back the credit.
+            $this->notifyWalletCredited($credited->user, (float) $credited->amount, (string) $credited->currency);
         }
 
         return response()->json(['received' => true]);
@@ -173,46 +193,17 @@ class GFSolutionsController extends BaseController
     // Private helpers
     // =========================================================================
 
-    private function creditWallet(PawaPayTransaction $tx): void
+    /**
+     * Compare the stored (requested) amount with the amount reported by the callback.
+     * Amounts are whole FCFA; compared in cents to avoid float noise ("5000" vs "5000.00").
+     */
+    private function amountMatches($expected, $received): bool
     {
-        if ($tx->status === 'completed') {
-            return;
+        if (! is_numeric($received)) {
+            return false;
         }
 
-        $user = $tx->user;
-
-        if ($user->hasRole('driver')) {
-            $wallet = DriverWallet::firstOrCreate(['user_id' => $user->driver->id]);
-            $wallet->increment('amount_added', $tx->amount);
-            $wallet->increment('amount_balance', $tx->amount);
-
-            DriverWalletHistory::create([
-                'user_id'        => $user->driver->id,
-                'amount'         => $tx->amount,
-                'transaction_id' => $tx->transaction_id,
-                'remarks'        => WalletRemarks::MONEY_DEPOSITED_TO_E_WALLET,
-                'is_credit'      => true,
-            ]);
-        } else {
-            $wallet = UserWallet::firstOrCreate(['user_id' => $user->id]);
-            $wallet->increment('amount_added', $tx->amount);
-            $wallet->increment('amount_balance', $tx->amount);
-
-            UserWalletHistory::create([
-                'user_id'        => $user->id,
-                'amount'         => $tx->amount,
-                'transaction_id' => $tx->transaction_id,
-                'remarks'        => WalletRemarks::MONEY_DEPOSITED_TO_E_WALLET,
-                'is_credit'      => true,
-            ]);
-        }
-
-        $tx->update([
-            'status'         => 'completed',
-            'pawapay_status' => 'COMPLETED',
-        ]);
-
-        $this->notifyWalletCredited($user, $tx->amount, $tx->currency);
+        return (int) round(((float) $expected) * 100) === (int) round(((float) $received) * 100);
     }
 
     private function notifyWalletCredited($user, float $amount, string $currency): void

@@ -16,7 +16,7 @@ class AdminLoginRequest extends BaseRequest
         return [
 
             'email'     => 'sometimes|required|email|exists:users,email',
-            'password'  => 'sometimes|required',
+            'password'  => 'required|string',
 
         ];
     }

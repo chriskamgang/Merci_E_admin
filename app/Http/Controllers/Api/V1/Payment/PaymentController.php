@@ -25,6 +25,9 @@ use App\Transformers\Payment\OwnerWalletHistoryTransformer;
 use App\Models\Payment\UserWallet;
 use App\Models\Payment\DriverWallet;
 use App\Models\Payment\OwnerWallet;
+use App\Models\Payment\RewardPoint;
+use App\Services\WalletService;
+use Illuminate\Support\Facades\DB;
 use App\Jobs\Notifications\AndroidPushNotification;
 use App\Jobs\Notifications\SendPushNotification;
 use Illuminate\Support\Facades\Mail;
@@ -492,173 +495,156 @@ class PaymentController extends BaseController
     {
         $request->validate([
             'mobile' => 'required',
-            'role' => 'required',
-            'amount' => 'required'
+            'role' => 'required|in:user,driver,owner',
+            'amount' => ['required', 'numeric', 'gt:0', function ($attribute, $value, $fail) {
+                if (floor((float) $value) != (float) $value) {
+                    $fail('The amount must be a whole number of FCFA.');
+                }
+            }],
         ]);
-        if ($request->amount < 0) {
-            $this->throwCustomException('Invalid Amount');
-        }
         $user = auth()->user();
 
         $invalid_mobile = false;
 
         if ($user->hasRole('user') && $request->role == 'user') {
-
             $invalid_mobile = true;
-
         }
         if ($user->hasRole('driver') && $request->role == 'driver') {
-
             $invalid_mobile = true;
-
         }
         if ($user->hasRole('owner') && $request->role == 'owner') {
-
             $invalid_mobile = true;
-
         }
         if ($request->mobile == $user->mobile && $invalid_mobile) {
-
-            //Throw exception
             $this->throwCustomException('Invalid Mobile Number');
+        }
 
-        }
+        // Sender wallet
         if (access()->hasRole('user')) {
-            $wallet_model = new UserWallet();
+            $sender_wallet_class = UserWallet::class;
             $wallet_history_model = new UserWalletHistory();
-            $user_id = auth()->user()->id;
-        }
-        elseif ($user->hasRole('driver')) {
-            $wallet_model = new DriverWallet();
+            $user_id = $user->id;
+        } elseif ($user->hasRole('driver')) {
+            $sender_wallet_class = DriverWallet::class;
             $wallet_history_model = new DriverWalletHistory();
             $user_id = $user->driver->id;
-        }
-        else {
-            $wallet_model = new OwnerWallet();
+        } else {
+            $sender_wallet_class = OwnerWallet::class;
             $wallet_history_model = new OwnerWalletHistory();
             $user_id = $user->owner->id;
         }
 
-        $user_wallet = $wallet_model::whereUserId($user_id)->first();
-
-        $minimum_wallet_amount = get_settings(Settings::MINIMUM_WALLET_AMOUNT_FOR_TRANSFER);
-
-        if ($user_wallet && $user_wallet->amount_balance < $minimum_wallet_amount) {
-
-            //Throw exception
-            $this->throwCustomException('Insufficient balance to transfer money to wallet');
-
-        }
-
         $mobile_number = $request->mobile;
         $role = $request->role;
-        $amount_to_transfer = $request->amount;
+        $amount_to_transfer = (float) $request->amount;
 
-        // Validate requested amount with current balance
-
-        if ($user_wallet->amount_balance < $amount_to_transfer) {
-            // Throw exception
-            $this->throwCustomException('Insufficient Balance');
-        }
-
-        // Find Receiver Wallet
-
+        // Receiver
         $receiver_user = User::belongsTorole($role)->where('mobile', $mobile_number)->first();
 
-        if (!$receiver_user) {
+        if (! $receiver_user) {
             $this->throwCustomException('Mobile Number Does Not Exists');
         }
-
-        $transaction_id = str_random(6);
+        if ($receiver_user->id == $user->id) {
+            $this->throwCustomException('Invalid Mobile Number');
+        }
 
         if ($role == 'user') {
+            $receiver_wallet_class = UserWallet::class;
+            $receiver_history_class = UserWalletHistory::class;
+            $receiver_owner_id = $receiver_user->id;
+        } elseif ($role == 'driver') {
+            $receiver_wallet_class = DriverWallet::class;
+            $receiver_history_class = DriverWalletHistory::class;
+            $receiver_owner_id = $receiver_user->driver?->id;
+        } else {
+            $receiver_wallet_class = OwnerWallet::class;
+            $receiver_history_class = OwnerWalletHistory::class;
+            $receiver_owner_id = $receiver_user->owner?->id;
+        }
 
-            $receiver_wallet = $receiver_user->userWallet;
-            if ($receiver_wallet == null) {
+        if (! $receiver_owner_id) {
+            $this->throwCustomException('This user Does Not have an E-Wallet');
+        }
+
+        $sender_key = (new $sender_wallet_class)->getTable().'|'.$user_id;
+        $receiver_key = (new $receiver_wallet_class)->getTable().'|'.$receiver_owner_id;
+
+        if ($sender_key === $receiver_key) {
+            $this->throwCustomException('Invalid Mobile Number');
+        }
+
+        $minimum_wallet_amount = (float) get_settings(Settings::MINIMUM_WALLET_AMOUNT_FOR_TRANSFER);
+        $transaction_id = str_random(6);
+
+        // Lock both wallets (in a stable order to avoid deadlocks), re-check the balance
+        // under the lock and move the money atomically.
+        $user_wallet = DB::transaction(function () use (
+            $sender_key, $receiver_key, $sender_wallet_class, $user_id, $receiver_wallet_class, $receiver_owner_id,
+            $amount_to_transfer, $minimum_wallet_amount, $wallet_history_model, $receiver_history_class,
+            $transaction_id, $user, $receiver_user
+        ) {
+            $specs = [
+                $sender_key => [$sender_wallet_class, $user_id],
+                $receiver_key => [$receiver_wallet_class, $receiver_owner_id],
+            ];
+            ksort($specs, SORT_STRING);
+            $locked = [];
+            foreach ($specs as $key => [$class, $owner_id]) {
+                $locked[$key] = WalletService::lockWallet($class, $owner_id, false);
+            }
+            $sender_wallet = $locked[$sender_key];
+            $receiver_wallet = $locked[$receiver_key];
+
+            if (! $receiver_wallet) {
                 $this->throwCustomException('This user Does Not have an E-Wallet');
             }
-            $receiver_wallet_history_model = new UserWalletHistory();
+            if (! $sender_wallet || $sender_wallet->amount_balance < $minimum_wallet_amount) {
+                $this->throwCustomException('Insufficient balance to transfer money to wallet');
+            }
+            if ($sender_wallet->amount_balance < $amount_to_transfer) {
+                $this->throwCustomException('Insufficient Balance');
+            }
+
             $receiver_wallet->amount_added += $amount_to_transfer;
             $receiver_wallet->amount_balance += $amount_to_transfer;
             $receiver_wallet->save();
 
-            $receiver_user->userWalletHistory()->create([
+            $receiver_history_class::create([
+                'user_id' => $receiver_owner_id,
                 'transaction_id' => $transaction_id,
                 'amount' => $amount_to_transfer,
                 'is_credit' => true,
-                'remarks' => 'transferred-from-' . $user->name
+                'remarks' => 'transferred-from-'.$user->name,
             ]);
 
-        }
-        elseif ($role == 'driver') {
+            $sender_wallet->amount_spent += $amount_to_transfer;
+            $sender_wallet->amount_balance -= $amount_to_transfer;
+            $sender_wallet->save();
 
-            $receiver_wallet = $receiver_user->driver->driverWallet;
-            if ($receiver_wallet == null) {
-                $this->throwCustomException('This user Does Not have an E-Wallet');
-            }
-            $receiver_wallet_history_model = new DriverWalletHistory();
-            $receiver_wallet->amount_added += $amount_to_transfer;
-            $receiver_wallet->amount_balance += $amount_to_transfer;
-            $receiver_wallet->save();
-
-            $receiver_user->driver->driverWalletHistory()->create([
+            $wallet_history_model::create([
+                'user_id' => $user_id,
+                'amount' => $amount_to_transfer,
                 'transaction_id' => $transaction_id,
-                'amount' => $amount_to_transfer,
-                'is_credit' => true,
-                'remarks' => 'transferred-from-' . $user->name
+                'remarks' => 'transfered-to-'.$receiver_user->name,
+                'is_credit' => false,
             ]);
 
-        }
-        elseif ($role == 'owner') {
+            return $sender_wallet;
+        });
 
-            $receiver_wallet = $receiver_user->owner->ownerWalletDetail;
-            if ($receiver_wallet == null) {
-                $this->throwCustomException('This user Does Not have an E-Wallet');
-            }
-            $receiver_wallet_history_model = new OwnerWalletHistory();
-            $receiver_wallet->amount_added += $amount_to_transfer;
-            $receiver_wallet->amount_balance += $amount_to_transfer;
-            $receiver_wallet->save();
-
-            $receiver_user->owner->ownerPaymentWalletHistoryDetail()->create([
-                'transaction_id' => str_random(6),
-                'amount' => $amount_to_transfer,
-                'is_credit' => true,
-                'remarks' => 'transferred-from-' . $user->name
-            ]);
-
-        }
-
-        // $title = custom_trans('you_have_received_a_money_from_title', [], $receiver_user->lang);
-
-        // $body = custom_trans('you_have_received_a_money_from_body', [], $receiver_user->lang);
-
-        // dispatch(new SendPushNotification($receiver_user,$title,$body));
-
-        $user_wallet->amount_spent -= $amount_to_transfer;
-        $user_wallet->amount_balance -= $amount_to_transfer;
-        $user_wallet->save();
-
-        $wallet_history_model::create([
-            'user_id' => $user_id,
-            'amount' => $request->amount,
-            'transaction_id' => $transaction_id,
-            'remarks' => 'transfered-to-' . $receiver_user->name,
-            'is_credit' => false]);
-        $transfer_remarks = $wallet_history_model->update(['remarks']);
-        $receiver_remarks = $receiver_wallet_history_model->update(['remarks']);
-        //        return $this->respondSuccess($remarks, 'transferred');
+        // Kept for response-shape compatibility with the apps (always false, as before).
+        $transfer_remarks = false;
+        $receiver_remarks = false;
 
         $currency = $user->countryDetail()->pluck('currency_symbol')->first();
 
         $notification = \DB::table('notification_channels')
             ->where('topics', 'User Amount Transfer') // Match the correct topic
             ->first();
-        //    send push notification 
+        //    send push notification
         if ($notification && $notification->push_notification == 1) {
             // Determine the user's language or default to 'en'
             $userLang = $receiver_user->lang ?? 'en';
-            // dd($userLang);
 
             // Fetch the translation based on user language or fall back to 'en'
             $translation = \DB::table('notification_channels_translations')
@@ -667,19 +653,19 @@ class PaymentController extends BaseController
                 ->first();
 
             // If no translation exists, fetch the default language (English)
-            if (!$translation) {
+            if (! $translation) {
                 $translation = \DB::table('notification_channels_translations')
                     ->where('notification_channel_id', $notification->id)
                     ->where('locale', 'en')
                     ->first();
             }
 
-
             $title = $translation->push_title ?? $notification->push_title;
             $body = strip_tags($translation->push_body ?? $notification->push_body);
             dispatch(new SendPushNotification($receiver_user, $title, $body));
         }
-        SendAmountTransferMailNotification::dispatch($user, $transaction_id, $currency, $request->amount, $user_wallet, $receiver_user);
+        SendAmountTransferMailNotification::dispatch($user, $transaction_id, $currency, $amount_to_transfer, $user_wallet, $receiver_user);
+
         return response()->json(['success' => true, 'transfer_remarks' => $transfer_remarks, 'receiver_remarks' => $receiver_remarks]);
     }
     /**
@@ -715,66 +701,80 @@ class PaymentController extends BaseController
      */
     public function transferCreditFromPoints(Request $request)
     {
-        $user = auth()->user();
-        $rewards_to_transfer = $request->amount;
-        if ($rewards_to_transfer > $user->rewardPoint->balance_reward_points) {
-            $this->throwCustomException('Insufficient Balance');
-        }
-
-
-        $user->rewardPoint->balance_reward_points -= $rewards_to_transfer;
-        $user->rewardPoint->points_spend += $rewards_to_transfer;
-        $user->rewardPoint->save();
-
-
-        $loyalty_remarks = $user->rewardHistory()->create([
-            'reward_points' => $rewards_to_transfer,
-            'is_credit' => false,
-            'remarks' => "conversion-from-point",
+        $request->validate([
+            'amount' => 'required|numeric|gt:0',
         ]);
-        $amount_to_transfer = number_format($rewards_to_transfer / get_settings('reward_point_value'), 2);
+
+        $user = auth()->user();
+        $rewards_to_transfer = (float) $request->amount;
+
+        $point_value = (float) get_settings('reward_point_value');
+        if ($point_value <= 0) {
+            $this->throwCustomException('Reward point conversion is not available');
+        }
 
         if ($user->hasRole('user')) {
-            $wallet_model = new UserWallet();
+            $wallet_class = UserWallet::class;
             $wallet_history_model = new UserWalletHistory();
             $user_id = $user->id;
-
-        }
-        elseif ($user->hasRole('driver')) {
-            $wallet_model = new DriverWallet();
+        } elseif ($user->hasRole('driver') && $user->driver) {
+            $wallet_class = DriverWallet::class;
             $wallet_history_model = new DriverWalletHistory();
             $user_id = $user->driver->id;
-
+        } else {
+            $this->throwCustomException('Invalid user');
         }
 
-        $user_wallet = $wallet_model::whereUserId($user_id)->first();
-        $user_wallet->amount_spent += $amount_to_transfer;
-        $user_wallet->amount_balance += $amount_to_transfer;
-        $user_wallet->save();
+        // Raw numeric arithmetic (never number_format, which yields "1,234.00").
+        $amount_to_transfer = round($rewards_to_transfer / $point_value, 2);
+        if ($amount_to_transfer <= 0) {
+            $this->throwCustomException('Invalid Amount');
+        }
 
-        $wallet_history = $wallet_history_model::create([
-            'user_id' => $user_id,
-            'amount' => $amount_to_transfer,
-            'transaction_id' => str_random(6),
-            'remarks' => "conversion-from-point",
-            'is_credit' => true
-        ]);
+        [$wallet_history, $loyalty_remarks] = DB::transaction(function () use (
+            $user, $rewards_to_transfer, $amount_to_transfer, $wallet_class, $wallet_history_model, $user_id, $request
+        ) {
+            $reward_point = RewardPoint::where('user_id', $user->id)->lockForUpdate()->first();
 
-        // $title = custom_trans('conversion_credited_title', [], $user->lang);
+            if (! $reward_point || $rewards_to_transfer > $reward_point->balance_reward_points) {
+                $this->throwCustomException('Insufficient Balance');
+            }
 
-        // $body = custom_trans('conversion_credited_body', [], $user->lang);
+            $reward_point->balance_reward_points -= $rewards_to_transfer;
+            $reward_point->points_spend += $rewards_to_transfer;
+            $reward_point->save();
 
-        // dispatch(new SendPushNotification($user,$title,$body));
+            $loyalty_remarks = $user->rewardHistory()->create([
+                'reward_points' => (string) $request->amount,
+                'is_credit' => false,
+                'remarks' => 'conversion-from-point',
+            ]);
+
+            $user_wallet = WalletService::lockWallet($wallet_class, $user_id);
+            $user_wallet->amount_added += $amount_to_transfer;
+            $user_wallet->amount_balance += $amount_to_transfer;
+            $user_wallet->save();
+
+            $wallet_history = $wallet_history_model::create([
+                'user_id' => $user_id,
+                // string: the driver app parses wallet_remarks.amount as a String
+                'amount' => number_format($amount_to_transfer, 2, '.', ''),
+                'transaction_id' => str_random(6),
+                'remarks' => 'conversion-from-point',
+                'is_credit' => true,
+            ]);
+
+            return [$wallet_history, $loyalty_remarks];
+        });
 
         $notification = \DB::table('notification_channels')
             ->where('topics', 'User Transfer Credit Points') // Match the correct topic
             ->first();
 
-        //    send push notification 
+        //    send push notification
         if ($notification && $notification->push_notification == 1) {
             // Determine the user's language or default to 'en'
             $userLang = $user->lang ?? 'en';
-            // dd($userLang);
 
             // Fetch the translation based on user language or fall back to 'en'
             $translation = \DB::table('notification_channels_translations')
@@ -783,7 +783,7 @@ class PaymentController extends BaseController
                 ->first();
 
             // If no translation exists, fetch the default language (English)
-            if (!$translation) {
+            if (! $translation) {
                 $translation = \DB::table('notification_channels_translations')
                     ->where('notification_channel_id', $notification->id)
                     ->where('locale', 'en')
@@ -795,8 +795,9 @@ class PaymentController extends BaseController
             dispatch(new SendPushNotification($user, $title, $body));
         }
 
-        return response()->json(['success' => true, 'wallet_remarks' => $user_wallet, 'loyalty_remarks' => $loyalty_remarks]);
-
+        // wallet_remarks = the wallet history entry (matches the documented response and the
+        // driver app's DriverRewardsPointsModel; previously the wallet row was returned).
+        return response()->json(['success' => true, 'wallet_remarks' => $wallet_history, 'loyalty_remarks' => $loyalty_remarks]);
     }
 
 

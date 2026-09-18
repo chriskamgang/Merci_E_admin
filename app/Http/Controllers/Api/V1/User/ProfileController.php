@@ -537,23 +537,88 @@ class ProfileController extends ApiController
     public function updateLocation(Request $request)
     {
         $request->validate([
-        'current_lat' => 'required',
-        'current_lng' => 'required',
+        'current_lat' => 'required|numeric',
+        'current_lng' => 'required|numeric',
         ]);
 
+        $user = auth()->user();
+        $lat = $request->current_lat;
+        $lng = $request->current_lng;
 
-        Log::info("location", $request->all());
-        $zone = find_zone($request->current_lat,$request->current_lng);
-        // Log::info(auth()->user()->id);
-        
+        // Update zone in MySQL
+        $zone = find_zone($lat, $lng);
         if($zone){
-            auth()->user()->update(['zone_id'=>$zone->id,'service_location_id'=>$zone->service_location_id,'current_lat'=>$request->current_lat, 'current_lng' =>$request->current_lng]);
-            if(auth()->user()->timezone != $zone->serviceLocation->timezone){
-                auth()->user()->update(['timezone'=>$zone->serviceLocation->timezone]);
+            $user->update(['zone_id'=>$zone->id,'service_location_id'=>$zone->service_location_id,'current_lat'=>$lat, 'current_lng' =>$lng]);
+            if($user->timezone != $zone->serviceLocation->timezone){
+                $user->update(['timezone'=>$zone->serviceLocation->timezone]);
             }
-
+        } else {
+            $user->update(['current_lat'=>$lat, 'current_lng' =>$lng]);
         }
 
+        // Update Firebase — driver position + ride data
+        try {
+            $database = app(Database::class);
+            $driver = $user->driver;
+
+            if ($driver) {
+                $g = new \Sk\Geohash\Geohash();
+                $geohash = $g->encode($lat, $lng, 12);
+
+                // Update driver position in Firebase
+                $database->getReference('drivers/driver_' . $driver->id)->update([
+                    'l' => ['0' => (float)$lat, '1' => (float)$lng],
+                    'g' => $geohash,
+                    'updated_at' => Database::SERVER_TIMESTAMP,
+                    'bearing' => 0,
+                    'date' => now()->toString(),
+                ]);
+
+                // If driver has active ride, update distance/duration in requests node
+                $activeRequest = $driver->requestDetail()
+                    ->where('is_cancelled', false)
+                    ->where('is_completed', false)
+                    ->where('is_driver_started', true)
+                    ->first();
+
+                if ($activeRequest) {
+                    $updateData = [
+                        'lat' => (float)$lat,
+                        'lng' => (float)$lng,
+                        'driver_id' => $driver->id,
+                        'name' => $user->name,
+                        'reported_at' => Database::SERVER_TIMESTAMP,
+                    ];
+
+                    // Calculate distance to drop if trip started and has drop location
+                    if ($activeRequest->is_trip_start && $activeRequest->drop_lat && $activeRequest->drop_lng) {
+                        $dist = distance_between_two_coordinates($lat, $lng, $activeRequest->drop_lat, $activeRequest->drop_lng, 'K');
+                        $totalTime = $activeRequest->total_time ?? 0;
+                        $totalDist = $activeRequest->total_distance ?? 1;
+                        $minPerDist = $totalDist > 0 ? $totalTime / $totalDist : 0;
+
+                        $distFromPick = distance_between_two_coordinates(
+                            $activeRequest->pick_lat, $activeRequest->pick_lng,
+                            $lat, $lng, 'K'
+                        );
+                        $calDuration = max(0, $totalTime - ($distFromPick * $minPerDist));
+
+                        $updateData['distance'] = $dist * 1000;
+                        $updateData['duration'] = $calDuration;
+                    } elseif (!$activeRequest->is_trip_start && $activeRequest->pick_lat && $activeRequest->pick_lng) {
+                        // Driver heading to pickup
+                        $dist = distance_between_two_coordinates($lat, $lng, $activeRequest->pick_lat, $activeRequest->pick_lng, 'K');
+                        $updateData['distance'] = $dist * 1000;
+                        // Rough ETA: 30 km/h average in city
+                        $updateData['duration'] = ($dist / 30) * 60;
+                    }
+
+                    $database->getReference('requests/' . $activeRequest->id)->update($updateData);
+                }
+            }
+        } catch (\Exception $e) {
+            Log::error('updateLocation Firebase error: ' . $e->getMessage());
+        }
 
         return $this->respondSuccess();
     }

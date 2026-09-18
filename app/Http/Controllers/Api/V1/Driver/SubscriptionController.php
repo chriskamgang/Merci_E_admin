@@ -107,25 +107,32 @@ class SubscriptionController extends Controller
             'expired_at' => $expire_at,
         ];
         $params['transaction_id'] = str_random(6);
-        $driver_wallet = $driver->DriverWallet;
-        if($amount > $driver_wallet->amount_balance){
-            $this->throwCustomException('Insufficient Wallet Balance');
-        }
-        $driver_wallet->amount_balance -= $amount;
-        $driver_wallet->amount_spent += $amount;
-        $driver_wallet->save();
-        $driver->driverWalletHistory()->create([
-            'amount'=>$amount,
-            'transaction_id'=>str_random(6),
-            'remarks'=>WalletRemarks::SUBSCRIPTION_FEE,
-            'is_credit'=>false,
-        ]);
-        $params['subscription_type'] = 1;
-        $subscription = SubscriptionDetail::create($params);
-        Driver::where('id',$driver->id)->update([
-            'is_subscribed' => true,
-            'subscription_detail_id' => $subscription->id,
-        ]);
+        // Lock the driver + wallet rows so parallel requests cannot both pass the checks
+        // (lost update => two subscriptions for the price of one / negative balance).
+        \Illuminate\Support\Facades\DB::transaction(function () use ($driver, $amount, &$params) {
+            if (Driver::whereKey($driver->id)->lockForUpdate()->value('is_subscribed')) {
+                $this->throwCustomException('Driver already subscribed');
+            }
+            $driver_wallet = \App\Services\WalletService::lockWallet(DriverWallet::class, $driver->id, false);
+            if (! $driver_wallet || $amount > $driver_wallet->amount_balance) {
+                $this->throwCustomException('Insufficient Wallet Balance');
+            }
+            $driver_wallet->amount_balance -= $amount;
+            $driver_wallet->amount_spent += $amount;
+            $driver_wallet->save();
+            $driver->driverWalletHistory()->create([
+                'amount' => $amount,
+                'transaction_id' => str_random(6),
+                'remarks' => WalletRemarks::SUBSCRIPTION_FEE,
+                'is_credit' => false,
+            ]);
+            $params['subscription_type'] = 1;
+            $subscription = SubscriptionDetail::create($params);
+            Driver::where('id', $driver->id)->update([
+                'is_subscribed' => true,
+                'subscription_detail_id' => $subscription->id,
+            ]);
+        });
 
         $data = [
             'is_subscribed' => 1,

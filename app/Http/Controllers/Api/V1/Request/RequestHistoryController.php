@@ -120,7 +120,12 @@ class RequestHistoryController extends BaseController
         } else {
             $includes=['driverDetail','requestBill'];
         }
-        $query = $this->request->where('id', $id);
+        // Only the passenger, the assigned driver or the fleet owner may view a request.
+        $query = $this->request->where('id', $id)->visibleTo(auth()->user());
+
+        if (!$query->exists()) {
+            return $this->respondNotFound('request_not_found');
+        }
 
         $result  = filter($query, new TripRequestTransformer)->customIncludes($includes)->first();
 
@@ -148,8 +153,13 @@ class RequestHistoryController extends BaseController
      *     "message": "Invoice Sent"
      * }
      */
-    public function invoice(RequestModel $requestmodel,)
+    public function invoice(RequestModel $requestmodel)
     {
+        // Only the passenger, the assigned driver or the fleet owner may receive the invoice.
+        if (!RequestModel::where('id', $requestmodel->id)->visibleTo(auth()->user())->exists()) {
+            return $this->respondNotFound('request_not_found');
+        }
+
         $fractalData = fractal($requestmodel, new TripRequestTransformer)
                         ->parseIncludes(['userDetail', 'driverDetail', 'requestBill', 'rejectedDrivers'])
                         ->toArray();

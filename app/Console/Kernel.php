@@ -9,6 +9,7 @@ use App\Console\Commands\NotifyDriverDocumentExpiry;
 use App\Console\Commands\AssignDriversForScheduledRides;
 use App\Console\Commands\AssignDriversForRegularRides;
 use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
+use App\Jobs\KPayPollPendingTransactions;
 use App\Console\Commands\ClearDemoDatabase;
 use App\Console\Commands\ClearRequestTable;
 use App\Console\Commands\ClearOtp;
@@ -64,6 +65,7 @@ class Kernel extends ConsoleKernel
                  ->everyMinute();      
                  
         $schedule->command('promotion:deactivate-expired')->everyMinute();
+        $schedule->job(new KPayPollPendingTransactions)->everyMinute();
     }
 
     /**

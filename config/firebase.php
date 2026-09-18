@@ -13,6 +13,19 @@ return [
 
     /*
      * ------------------------------------------------------------------------
+     * Service account JSON location (SECURITY)
+     * ------------------------------------------------------------------------
+     *
+     * The Firebase Admin service account holds a private key and must never live
+     * under public/. AppServiceProvider and the admin "Firebase settings" upload
+     * screen both use this path (see firebase_service_account_path()).
+     * Relative paths are resolved against the project base path.
+     */
+
+    'service_account_path' => env('FIREBASE_SERVICE_ACCOUNT_PATH', 'storage/app/private/firebase.json'),
+
+    /*
+     * ------------------------------------------------------------------------
      * Firebase project configurations
      * ------------------------------------------------------------------------
      */

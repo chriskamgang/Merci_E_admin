@@ -1,0 +1,62 @@
+{
+  "rules": {
+    "drivers": {
+      "driver_$driverId": {
+        ".read": "auth != null",
+        ".write": "auth != null && auth.uid == $driverId"
+      },
+      ".read": "auth != null",
+      ".indexOn": ["g", "is_active", "is_available", "updated_at"]
+    },
+    "requests": {
+      "$requestId": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      }
+    },
+    "request-meta": {
+      "$requestId": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      }
+    },
+    "bid-meta": {
+      "$requestId": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      }
+    },
+    "peak-zones": {
+      ".read": "auth != null",
+      ".write": false
+    },
+    "conversation": {
+      "$conversationId": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      }
+    },
+    "SOS": {
+      "$requestId": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      }
+    },
+    "admin-notification": {
+      ".read": false,
+      ".write": false
+    },
+    "owners": {
+      ".read": false,
+      ".write": false
+    },
+    "franchise_owners": {
+      ".read": false,
+      ".write": false
+    },
+    "$other": {
+      ".read": false,
+      ".write": false
+    }
+  }
+}

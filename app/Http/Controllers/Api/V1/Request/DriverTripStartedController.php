@@ -53,6 +53,9 @@ class DriverTripStartedController extends BaseController
         // Get Request Detail
         $request_detail = $this->request->where('id', $request->input('request_id'))->first();
 
+        // Check the caller is the assigned driver before revealing anything about the OTP.
+        $this->validateRequest($request_detail);
+
         if($request->has('ride_otp')){
 
         if($request_detail->ride_otp != $request->ride_otp){

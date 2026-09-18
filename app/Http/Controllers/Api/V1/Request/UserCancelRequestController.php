@@ -36,6 +36,11 @@ use App\Http\Controllers\Api\V1\Payment\Stripe\StripeController;
 class UserCancelRequestController extends StripeController
 {
 
+    /**
+     * Upper bound for a single driver tip, in FCFA.
+     */
+    const MAX_TIP_AMOUNT = 100000;
+
     use PaymentOptionCalculationHelper;
     use CancellationFeeHelper;
     protected $database;
@@ -321,7 +326,8 @@ class UserCancelRequestController extends StripeController
     public function driverTip(Request $request) {
         $request->validate([
             'request_id' =>  'required',
-            'tip_amount' =>  'required',
+            // FCFA has no minor unit; the app may send "500.0", so accept numeric and round below.
+            'tip_amount' =>  'required|numeric|min:0|max:'.self::MAX_TIP_AMOUNT,
         ]);
 
         $request_detail = RequestRequest::where('id', $request->input('request_id'))->where('is_completed', true)->where('user_id',auth()->user()->id)->first();
@@ -337,15 +343,26 @@ class UserCancelRequestController extends StripeController
             return $this->respondSuccess($result);
         }
 
-        $tips = (double) $request->tip_amount;
+        $tips = (int) round((float) $request->tip_amount);
 
-        $requestBill = $request_detail->requestBill;
+        if (!$request_detail->requestBill) {
+            return $this->respondNotFound('request_bill_not_found');
+        }
 
-        $request_detail->requestBill()->update(
-            [
+        // A request bill holds a single tip: a new call replaces the previous tip instead of
+        // stacking it, so remove the previously added tip from the driver commission first.
+        // The row lock keeps two concurrent calls from both adding their tip.
+        $requestBill = \Illuminate\Support\Facades\DB::transaction(function () use ($request_detail, $tips) {
+            $bill = $request_detail->requestBill()->lockForUpdate()->first();
+            $previous_tips = (float) ($bill->tips ?? 0);
+
+            $bill->update([
                 'tips'=>$tips,
-                'driver_commision'=>$requestBill->driver_commision + $tips,
+                'driver_commision'=>$bill->driver_commision - $previous_tips + $tips,
             ]);
+
+            return $bill;
+        });
 
             $requestBill->fresh();
 

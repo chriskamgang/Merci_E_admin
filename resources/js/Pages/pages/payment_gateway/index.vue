@@ -32,10 +32,12 @@ export default {
         const { t } = useI18n();
 
         const form = useForm({
-            enable_pawapay:        props.settings.enable_pawapay ?? false,
-            pawapay_environment:   props.settings.pawapay_environment ?? 'sandbox',
-            pawapay_sandbox_token: props.settings.pawapay_sandbox_token ?? '',
-            pawapay_live_token:    props.settings.pawapay_live_token ?? '',
+            enable_kpay:            props.settings.enable_kpay ?? false,
+            kpay_environment:       props.settings.kpay_environment ?? 'test',
+            kpay_test_api_key:      props.settings.kpay_test_api_key ?? '',
+            kpay_test_secret_key:   props.settings.kpay_test_secret_key ?? '',
+            kpay_live_api_key:      props.settings.kpay_live_api_key ?? '',
+            kpay_live_secret_key:   props.settings.kpay_live_secret_key ?? '',
 
             enable_gfsolutions:     props.settings.enable_gfsolutions ?? false,
             gfsolutions_api_key:    props.settings.gfsolutions_api_key ?? '',
@@ -117,23 +119,23 @@ export default {
                     <BCardBody class="border border-dashed border-end-0 border-start-0">
                         <BRow class="mt-4">
 
-                            <!-- PawaPay -->
+                            <!-- KPay -->
                             <BCol lg="6" class="mb-4">
                                 <BCard no-body class="border h-100">
                                     <BCardHeader class="border-0">
                                         <div class="row border-bottom p-2">
                                             <div class="col-6">
-                                                <h5 class="mt-1">PawaPay</h5>
+                                                <h5 class="mt-1">KPay</h5>
                                             </div>
                                             <div class="col-6">
                                                 <div class="form-check form-switch form-switch-lg float-end me-3">
                                                     <input
-                                                        v-model="form.enable_pawapay"
+                                                        v-model="form.enable_kpay"
                                                         class="form-check-input"
                                                         type="checkbox"
                                                         role="switch"
-                                                        id="enable_pawapay"
-                                                        @change="handleCheckboxChange('enable_pawapay')"
+                                                        id="enable_kpay"
+                                                        @change="handleCheckboxChange('enable_kpay')"
                                                     />
                                                 </div>
                                             </div>
@@ -141,59 +143,69 @@ export default {
                                     </BCardHeader>
                                     <BCardBody>
                                         <div class="text-center mb-4">
-                                            <img src="https://pawapay.io/wp-content/uploads/2022/09/pawaPay_logo_dark.svg" style="height:40px;" alt="PawaPay" />
+                                            <span class="badge bg-success-subtle text-success fs-20 p-3 rounded-3">
+                                                <i class="ri-smartphone-line fs-24 me-1"></i> KPay Mobile Money
+                                            </span>
                                         </div>
 
-                                        <!-- Environment -->
+                                        <!-- Environment Toggle -->
                                         <div class="mb-3">
                                             <label class="form-label">Environnement</label>
-                                            <select class="form-select" v-model="form.pawapay_environment" :disabled="app_for === 'demo'">
-                                                <option value="sandbox">Sandbox (test)</option>
+                                            <select class="form-select" v-model="form.kpay_environment" :disabled="app_for === 'demo'">
+                                                <option value="test">Sandbox (test)</option>
                                                 <option value="live">Live (production)</option>
                                             </select>
+                                            <small class="text-muted">
+                                                <span v-if="form.kpay_environment === 'test'" class="text-warning"><i class="ri-flask-line"></i> Mode test — les transactions ne sont pas réelles</span>
+                                                <span v-else class="text-danger"><i class="ri-alert-line"></i> Mode production — les transactions sont réelles</span>
+                                            </small>
                                         </div>
 
-                                        <!-- Sandbox Token -->
-                                        <div class="mb-3" v-if="form.pawapay_environment === 'sandbox'">
-                                            <label class="form-label">API Token Sandbox</label>
-                                            <input
-                                                :type="app_for === 'demo' ? 'password' : 'text'"
-                                                :readonly="app_for === 'demo'"
-                                                class="form-control"
-                                                placeholder="Bearer token sandbox PawaPay"
-                                                v-model="form.pawapay_sandbox_token"
-                                            />
-                                        </div>
-
-                                        <!-- Live Token -->
-                                        <div class="mb-3" v-if="form.pawapay_environment === 'live'">
-                                            <label class="form-label">API Token Live</label>
-                                            <input
-                                                :type="app_for === 'demo' ? 'password' : 'text'"
-                                                :readonly="app_for === 'demo'"
-                                                class="form-control"
-                                                placeholder="Bearer token live PawaPay"
-                                                v-model="form.pawapay_live_token"
-                                            />
-                                        </div>
-
-                                        <!-- Callback URLs -->
-                                        <div class="mb-3">
-                                            <label class="form-label">URL Callback Dépôt <small class="text-muted">(à configurer dans le dashboard PawaPay)</small></label>
-                                            <div class="input-group">
-                                                <input type="text" class="form-control form-control-sm text-muted" readonly :value="settings.pawapay_deposit_callback" />
-                                                <button class="btn btn-outline-secondary btn-sm" type="button" @click="() => navigator.clipboard.writeText(settings.pawapay_deposit_callback)">
-                                                    <i class="ri-file-copy-line"></i>
-                                                </button>
+                                        <!-- Test Keys -->
+                                        <div v-if="form.kpay_environment === 'test'">
+                                            <div class="mb-3">
+                                                <label class="form-label">API Key (Test)</label>
+                                                <input
+                                                    :type="app_for === 'demo' ? 'password' : 'text'"
+                                                    :readonly="app_for === 'demo'"
+                                                    class="form-control"
+                                                    placeholder="kpay_test_xxxxxxxxxxxx"
+                                                    v-model="form.kpay_test_api_key"
+                                                />
+                                            </div>
+                                            <div class="mb-3">
+                                                <label class="form-label">Secret Key (Test)</label>
+                                                <input
+                                                    type="password"
+                                                    :readonly="app_for === 'demo'"
+                                                    class="form-control"
+                                                    placeholder="Clé secrète test"
+                                                    v-model="form.kpay_test_secret_key"
+                                                />
                                             </div>
                                         </div>
-                                        <div class="mb-3">
-                                            <label class="form-label">URL Callback Retrait <small class="text-muted">(à configurer dans le dashboard PawaPay)</small></label>
-                                            <div class="input-group">
-                                                <input type="text" class="form-control form-control-sm text-muted" readonly :value="settings.pawapay_payout_callback" />
-                                                <button class="btn btn-outline-secondary btn-sm" type="button" @click="() => navigator.clipboard.writeText(settings.pawapay_payout_callback)">
-                                                    <i class="ri-file-copy-line"></i>
-                                                </button>
+
+                                        <!-- Live Keys -->
+                                        <div v-if="form.kpay_environment === 'live'">
+                                            <div class="mb-3">
+                                                <label class="form-label">API Key (Live)</label>
+                                                <input
+                                                    :type="app_for === 'demo' ? 'password' : 'text'"
+                                                    :readonly="app_for === 'demo'"
+                                                    class="form-control"
+                                                    placeholder="kpay_live_xxxxxxxxxxxx"
+                                                    v-model="form.kpay_live_api_key"
+                                                />
+                                            </div>
+                                            <div class="mb-3">
+                                                <label class="form-label">Secret Key (Live)</label>
+                                                <input
+                                                    type="password"
+                                                    :readonly="app_for === 'demo'"
+                                                    class="form-control"
+                                                    placeholder="Clé secrète live"
+                                                    v-model="form.kpay_live_secret_key"
+                                                />
                                             </div>
                                         </div>
 

@@ -16,7 +16,7 @@ class OnboardingTransformer extends Transformer
     public function transform(Onboarding $onboarding)
     {
         $baseUrl = config('app.url');
-        $imagePath = $baseUrl . 'storage/uploads/onboarding/' . $onboarding->onboarding_image;
+        $imagePath = $baseUrl . '/storage/uploads/onboarding/' . $onboarding->onboarding_image;
         $params= [
 
             'order' => $onboarding->order,

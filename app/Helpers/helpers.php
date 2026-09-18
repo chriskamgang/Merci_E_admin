@@ -593,6 +593,17 @@ if (!function_exists('get_sms_settings')) {
         return ThirdPartySetting::where('module', 'sms')->whereName($key)->pluck('value')->first();
     }
 }
+if (!function_exists('firebase_service_account_path')) {
+    /**
+     * Absolute path of the Firebase Admin service-account JSON (kept outside public/).
+     */
+    function firebase_service_account_path(): string
+    {
+        $path = (string) config('firebase.service_account_path', 'storage/app/private/firebase.json');
+
+        return str_starts_with($path, DIRECTORY_SEPARATOR) ? $path : base_path($path);
+    }
+}
 if (!function_exists('get_active_sms_settings')) {
     function get_active_sms_settings()
     {

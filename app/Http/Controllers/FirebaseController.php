@@ -28,9 +28,9 @@ class FirebaseController  extends Controller
     {
         $settings = ThirdPartySetting::where('module', 'firebase')->pluck('value', 'name')->toArray(); // firebase data
         
-        $existingJsonFile = file_exists(public_path('push-configurations/firebase.json')) ? 'firebase.json' : null;
-         // Check if the `firebase.json` file exists
-            $jsonFilePath = public_path('push-configurations/firebase.json');
+        // SECURITY: the service account is stored outside public/ (see firebase_service_account_path()).
+        $jsonFilePath = firebase_service_account_path();
+        $existingJsonFile = file_exists($jsonFilePath) ? 'firebase.json' : null;
 
             $firebase_json_validation = false;
 
@@ -105,13 +105,14 @@ class FirebaseController  extends Controller
 if ($request->hasFile('firebase_json')) {
     $uploadedFile = $request->file('firebase_json');
 
-    // Define the file name and destination path
-    $fileName = 'firebase.json';
-    $destinationPath = public_path('push-configurations');
+    // SECURITY: store the service account outside public/ (it contains a private key).
+    $targetPath = firebase_service_account_path();
+    $fileName = basename($targetPath);
+    $destinationPath = dirname($targetPath);
 
     // Check if the directory exists, create it if not
     if (!File::isDirectory($destinationPath)) {
-        File::makeDirectory($destinationPath, 0755, true, true);
+        File::makeDirectory($destinationPath, 0700, true, true);
     }
 
     // Delete the old file if it exists
@@ -122,6 +123,7 @@ if ($request->hasFile('firebase_json')) {
 
     // Move the uploaded file to the destination path
     $uploadedFile->move($destinationPath, $fileName);
+    @chmod($targetPath, 0600);
 }
 
     

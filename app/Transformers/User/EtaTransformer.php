@@ -21,6 +21,7 @@ use App\Base\Constants\Auth\Role;
 use Illuminate\Support\Facades\Log;
 use App\Helpers\Rides\RidePriceCalculationHelpers;
 use App\Models\Admin\FranchisePromo;
+use App\Models\Admin\CovoiturageRoutePrice;
 
 class EtaTransformer extends Transformer
 {
@@ -250,6 +251,25 @@ class EtaTransformer extends Transformer
 
         $ride = $this->calculateBillForARide($pick_lat,$pick_lng,$drop_lat,$drop_lng,$distance_in_unit, $total_duration, $zone_type, $type_prices, $coupon_detail,$timezone,null,0,null,null,$airport_surge_fee);
 
+        // Override with fixed route price for Covoiturage
+        if ($zone_type->vehicleType->is_accept_share_ride && request()->has("drop_lat") && request()->drop_lat) {
+            $fixedPrice = CovoiturageRoutePrice::findRoutePrice($pick_lat, $pick_lng, $drop_lat, $drop_lng);
+            if ($fixedPrice !== null) {
+                $ride->base_price = $fixedPrice;
+                $ride->distance_price = 0;
+                $ride->time_price = 0;
+                $ride->price_per_distance = 0;
+                $ride->price_per_time = 0;
+                $ride->subtotal_price = $fixedPrice;
+                $ride->tax_amount = 0;
+                $ride->total_price = $fixedPrice;
+                $ride->without_discount_admin_commision = 0;
+                $ride->discount_admin_commision = 0;
+                $ride->discount_amount = 0;
+                $ride->discounted_total_price = $fixedPrice;
+                $ride->discount_total_tax_amount = 0;
+            }
+        }
 
         if ($near_driver_status != 0) {
             if ($ride->pickup_duration != 0) {

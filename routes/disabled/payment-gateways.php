@@ -1,5 +1,11 @@
 <?php
 
+// SECURITY: this file is intentionally NOT loaded (moved out of routes/web/, which
+// routes/web.php auto-loads). These legacy gateways are unused (live: KPay + GFSolutions)
+// and their public success/webhook endpoints credited wallets / marked rides paid from
+// client-supplied data without provider verification. Do not re-enable without fixing that.
+
+
 use App\Http\Controllers\Web\PayPalController;
 use App\Http\Controllers\Web\StripeController;
 use App\Http\Controllers\Web\MyFatooraController;

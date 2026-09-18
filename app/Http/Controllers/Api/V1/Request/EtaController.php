@@ -382,8 +382,11 @@ class EtaController extends ApiController
         'drop_address'=>'required'
         ]);
 
-        // Get Request Detail
-        $request_detail = RequestModel::where('id', $request->input('request_id'))->first();
+        // Get Request Detail (only the passenger of the trip may change its drop)
+        $request_detail = RequestModel::where('id', $request->input('request_id'))->where('user_id', auth()->user()->id)->first();
+        if (!$request_detail) {
+            return $this->respondNotFound('request_not_found');
+        }
         if($request_detail->accepted_at !== null)
         {
             $request_place_params = ['drop_lat'=>$request->drop_lat,'drop_lng'=>$request->drop_lng,'drop_address'=>$request->drop_address];

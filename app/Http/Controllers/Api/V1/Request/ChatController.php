@@ -71,8 +71,9 @@ class ChatController extends BaseController
      */
     public function history(RequestModel $request)
     {
-
-        // Log::info("chat_id");
+        if (!$this->findOwnedRequest($request->id)) {
+            return $this->respondNotFound('request_not_found');
+        }
 
         $chats = $request->requestChat()->orderBy('created_at', 'asc')->get();
 
@@ -111,9 +112,11 @@ class ChatController extends BaseController
             $seen_from_type = 1;
         }
 
-        $request_detail = RequestModel::find($request->request_id);
+        $request_detail = $this->findOwnedRequest($request->request_id);
 
-        // $request_detail->requestChat()->where('from_type',$seen_from_type)->update(['seen'=>true]);
+        if (!$request_detail) {
+            return $this->respondNotFound('request_not_found');
+        }
 
         if($request_detail && $request_detail->requestChat()) // Ensure $request_detail is not null and requestChat() is not null
         {
@@ -148,7 +151,16 @@ class ChatController extends BaseController
             $from_type = 2;
         }
 
-        $request_detail = RequestModel::find($request->request_id);
+        $request->validate([
+            'request_id' => 'required',
+            'message' => 'required|string|max:2000',
+        ]);
+
+        $request_detail = $this->findOwnedRequest($request->request_id);
+
+        if (!$request_detail) {
+            return $this->respondNotFound('request_not_found');
+        }
 
         $request_detail->requestChat()->create([
             'message' => $request->message,
@@ -229,6 +241,31 @@ class ChatController extends BaseController
         return $this->respondSuccess(null, 'message_sent_successfully');
     }
 
+
+    /**
+     * Find a trip request the authenticated user takes part in (passenger or assigned driver).
+     * Returns null for unknown or non-owned ids so callers can answer 404.
+     */
+    private function findOwnedRequest($request_id)
+    {
+        if (!$request_id) {
+            return null;
+        }
+
+        $user = auth()->user();
+
+        return RequestModel::where('id', $request_id)->where(function ($q) use ($user) {
+            $q->whereRaw('1 = 0');
+
+            if ($user->hasRole(Role::USER)) {
+                $q->orWhere('user_id', $user->id);
+            }
+
+            if ($user->hasRole(Role::DRIVER) && $user->driver) {
+                $q->orWhere('driver_id', $user->driver->id);
+            }
+        })->first();
+    }
 
 //conversation Starts Here
     /**
@@ -335,7 +372,14 @@ class ChatController extends BaseController
 
         } 
         else{
-            $conversation_id = $request->conversation_id;
+            // Only allow posting into the caller's own conversation.
+            $conversation_id = Conversation::where('id', $request->conversation_id)
+                ->where('user_id', auth()->user()->id)
+                ->value('id');
+
+            if (!$conversation_id) {
+                return response()->json(['success' => false, 'message' => 'conversation_not_found'], 404);
+            }
         }
         $messages = new Message();
         $messages->conversation_id = $conversation_id;

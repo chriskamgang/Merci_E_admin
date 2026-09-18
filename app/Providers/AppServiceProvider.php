@@ -58,7 +58,8 @@ class AppServiceProvider extends ServiceProvider
             $firebase_database_url = 'https://your-firebase-db.firebaseio.com/';
         }
 
-        $firebaseCredentialsPath = public_path('push-configurations/firebase.json'); // Get full path
+        // SECURITY: service account lives outside public/ (was public/push-configurations/firebase.json).
+        $firebaseCredentialsPath = firebase_service_account_path();
 
         if(!$firebase_database_url){
             

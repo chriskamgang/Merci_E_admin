@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1\Auth\Registration;
 
 use App\Models\User;
+use App\Base\Services\OTP\OtpVerifier;
 use App\Models\Country;
 use App\Models\Admin\Driver;
 use Illuminate\Http\Request;
@@ -594,83 +595,43 @@ if ($request->has('mobile') && $request->has('email')) {
      */
     public function updatePassword(Request $request)
     {
+        $request->validate([
+            'email' => 'required_without:mobile|nullable|email',
+            'mobile' => 'required_without:email|nullable|string',
+            'otp' => 'required|string',
+            'password' => 'required|string|min:6',
+        ]);
 
-if($request->has('role') && $request->role=='driver'){
-/*Email*/
-        if($request->has('email')) {
-            $driver = Driver::where('email', $request->email)->first();
+        // Identify the account by exactly one identifier; never run an unfiltered query.
+        $byEmail = $request->filled('email') && ! $request->filled('mobile');
+        $column = $byEmail ? 'email' : 'mobile';
+        $identifier = (string) $request->input($column);
 
-            if($driver) {
-                $password = $request->password;
+        // The driver app sends role=driver for drivers and no role for fleet owners.
+        $account = ($request->input('role') == 'driver')
+            ? Driver::where($column, $identifier)->first()
+            : Owner::where($column, $identifier)->first();
 
-                // Hash the password
-                $hashedPassword = Hash::make($password);
+        if (! $account || ! $account->user) {
+            return response()->json(['success' => false, 'message' => 'User not found'], 404);
+        }
 
-                // Update the password
-                $driver->user->update(['password' => $hashedPassword]);
+        // Proof of ownership: verified, unexpired, single-use OTP sent to that email/mobile.
+        $otp = (string) $request->input('otp');
+        $verified = $byEmail
+            ? OtpVerifier::consumeEmailOtp($identifier, $otp)
+            : OtpVerifier::consumeMobileOtp($identifier, $otp);
 
-            return response()->json(['success'=>true,'message'=>'success','message'=>'password_updated_successfuly']);
+        if (! $verified) {
+            $this->throwCustomValidationException('The otp provided is invalid or has expired.', 'otp');
+        }
 
-            }
-         }
-/*mobile*/
-        if($request->has('mobile')) {
-            $driver = Driver::where('mobile', $request->mobile)->first();
+        $account->user->update(['password' => Hash::make($request->password)]);
 
-            if($driver) {
-                $password = $request->password;
+        // Invalidate existing API tokens after a password reset.
+        $account->user->tokens()->delete();
 
-                // Hash the password
-                $hashedPassword = Hash::make($password);
-
-                // Update the password
-                $driver->user->update(['password' => $hashedPassword]);
-
-             return response()->json(['success'=>true,'message'=>'success','message'=>'password_updated_successfuly']);
-
-            }
-          }
-/*mobile Ends*/
-  }else{
-
-/*Owner*/
-/*Email*/
-        if($request->has('email')) {
-            $owner = Owner::where('email', $request->email)->first();
-
-            if($owner) {
-                $password = $request->password;
-
-                // Hash the password
-                $hashedPassword = Hash::make($password);
-
-                // Update the password
-                $owner->user->update(['password' => $hashedPassword]);
-
-            return response()->json(['success'=>true,'message'=>'success','message'=>'password_updated_successfuly']);
-
-            }
-         }
-/*mobile*/
-        if($request->has('mobile')) {
-            $owner = Owner::where('mobile', $request->mobile)->first();
-
-            if($owner) {
-                $password = $request->password;
-
-                // Hash the password
-                $hashedPassword = Hash::make($password);
-
-                // Update the password
-                $owner->user->update(['password' => $hashedPassword]);
-
-             return response()->json(['success'=>true,'message'=>'success','message'=>'password_updated_successfuly']);
-
-            }
-          }
-/*mobile Ends*/
-
+        return response()->json(['success' => true, 'message' => 'password_updated_successfuly']);
     }
-  }//function ends
 
 }
