@@ -42,6 +42,7 @@ export default {
             nexah_user: props.settings?.nexah_user ?? '',
             nexah_password: props.settings?.nexah_password ?? '',
             nexah_sender_id: props.settings?.nexah_sender_id ?? '',
+            enable_firebase_otp: props.settings?.enable_firebase_otp ?? false,
         });
 
         const successMessage = ref(props.successMessage || '');
@@ -168,6 +169,32 @@ export default {
                                                     <button type="submit" class="btn btn-primary">{{ $t('save') }}</button>
                                                 </div>
                                             </div>
+                                        </BCardBody>
+                                    </BCard>
+                                </BCol>
+                                <BCol lg="6">
+                                    <BCard no-body class="border">
+                                        <BCardHeader class="border-0 mt-2 p-4 border-bottom">
+                                            <div class="row">
+                                                <div class="col-8">
+                                                    <h5>Firebase Phone Auth (OTP)</h5>
+                                                </div>
+                                                <div class="col-4">
+                                                    <div class="form-check form-switch form-switch-lg float-end me-3">
+                                                        <input v-model="form.enable_firebase_otp" class="form-check-input" type="checkbox" role="switch" id="enable_firebase_otp" @change="handleCheckboxChange('enable_firebase_otp')" />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </BCardHeader>
+                                        <BCardBody>
+                                            <p class="mb-2">
+                                                Les applications (passager et chauffeur) et le site web envoient le code SMS via Firebase
+                                                et le serveur vérifie le jeton Firebase. Activer Firebase désactive Nexah.
+                                            </p>
+                                            <p class="mb-0 text-muted">
+                                                The apps and web portal send the SMS code through Firebase phone auth and the server
+                                                verifies the Firebase ID token. Turning Firebase on turns Nexah off.
+                                            </p>
                                         </BCardBody>
                                     </BCard>
                                 </BCol>

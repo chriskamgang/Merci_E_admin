@@ -598,7 +598,9 @@ if ($request->has('mobile') && $request->has('email')) {
         $request->validate([
             'email' => 'required_without:mobile|nullable|email',
             'mobile' => 'required_without:email|nullable|string',
-            'otp' => 'required|string',
+            // Proof of ownership: a server OTP, or (mobile only) a Firebase phone-auth ID token.
+            'otp' => 'required_without:firebase_id_token|nullable|string',
+            'firebase_id_token' => 'required_without:otp|nullable|string|max:4096',
             'password' => 'required|string|min:6',
         ]);
 
@@ -616,14 +618,22 @@ if ($request->has('mobile') && $request->has('email')) {
             return response()->json(['success' => false, 'message' => 'User not found'], 404);
         }
 
-        // Proof of ownership: verified, unexpired, single-use OTP sent to that email/mobile.
+        // Proof of ownership: verified, unexpired, single-use OTP sent to that email/mobile,
+        // or a fresh single-use Firebase phone-auth token for that mobile.
         $otp = (string) $request->input('otp');
-        $verified = $byEmail
-            ? OtpVerifier::consumeEmailOtp($identifier, $otp)
-            : OtpVerifier::consumeMobileOtp($identifier, $otp);
+        if ($request->filled('firebase_id_token')) {
+            $verified = ! $byEmail
+                && $this->verifyFirebasePhoneToken((string) $request->input('firebase_id_token'), $account->user, $identifier);
+        } else {
+            $verified = $byEmail
+                ? OtpVerifier::consumeEmailOtp($identifier, $otp)
+                : OtpVerifier::consumeMobileOtp($identifier, $otp);
+        }
 
         if (! $verified) {
-            $this->throwCustomValidationException('The otp provided is invalid or has expired.', 'otp');
+            $request->filled('firebase_id_token')
+                ? $this->throwCustomValidationException('The phone verification is invalid or has expired.', 'firebase_id_token')
+                : $this->throwCustomValidationException('The otp provided is invalid or has expired.', 'otp');
         }
 
         $account->user->update(['password' => Hash::make($request->password)]);

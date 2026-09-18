@@ -18,6 +18,7 @@ class UserLoginRequest extends BaseRequest
             'password'  => 'sometimes|required',
             'mobile'    => 'sometimes|required|mobile_number|exists:users,mobile',
             'otp'       => 'sometimes|required|otp',
+            'firebase_id_token' => 'sometimes|required|string|max:4096',
         ];
     }
 

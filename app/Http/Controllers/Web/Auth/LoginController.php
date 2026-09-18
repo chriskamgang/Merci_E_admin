@@ -7,6 +7,7 @@ use App\Models\Setting;
 use App\Events\Event;
 use App\Models\MailOtp;
 use App\Base\Services\OTP\OtpVerifier;
+use App\Base\Services\OTP\FirebasePhoneVerifier;
 use Illuminate\Support\Str;
 use Illuminate\Http\Request;
 use App\Events\Auth\UserLogin;
@@ -356,6 +357,7 @@ class LoginController extends ApiController
     {
         $mobile = (string) $request->input('mobile');
         $otp = $request->filled('otp') ? (string) $request->input('otp') : null;
+        $firebaseIdToken = $request->filled('firebase_id_token') ? (string) $request->input('firebase_id_token') : null;
 
         $user = $this->resolveUserFromMobile($mobile, $role);
 
@@ -365,6 +367,16 @@ class LoginController extends ApiController
 
         if (! $user->isActive() || ! $this->validateChecks($user, $conditions, 'otp')) {
             $this->throwAccountDisabledException('otp');
+        }
+
+        // Firebase phone auth: the app verified the number with Firebase and sends the
+        // resulting ID token. It must be valid, fresh, single-use and match this account.
+        if ($firebaseIdToken !== null) {
+            if (! $this->verifyFirebasePhoneToken($firebaseIdToken, $user, $mobile)) {
+                $this->throwCustomValidationException('The phone verification is invalid or has expired.', 'firebase_id_token');
+            }
+
+            return $this->authenticateAndRespond($user, $request, $needsToken);
         }
 
         // Temporary compatibility for app builds released before the client started sending
@@ -382,6 +394,18 @@ class LoginController extends ApiController
         return $this->authenticateAndRespond($user, $request, $needsToken);
     }
 
+
+    /**
+     * Verify a Firebase phone-auth ID token against the account's mobile number.
+     *
+     * @param  string  $idToken  the `firebase_id_token` sent by the app
+     * @param  \App\Models\User  $user  the account the number belongs to (for its country dial code)
+     * @param  string  $mobile  the stored mobile the account was looked up by
+     */
+    protected function verifyFirebasePhoneToken(string $idToken, User $user, string $mobile): bool
+    {
+        return app(FirebasePhoneVerifier::class)->verify($idToken, $mobile, $user->countryDetail?->dial_code);
+    }
 
     /**
      * Resolve the user from their email for a particular role.
@@ -703,7 +727,8 @@ class LoginController extends ApiController
         $default_flag = $default_country->flag;
         $default_country_id = $default_country->id;
         
-        $enable_firebase_otp = get_active_sms_settings() == "enable_firebase_otp" ?? false;
+        // Same switch the apps read (GET /api/v1/common/modules -> firebase_otp_enabled).
+        $enable_firebase_otp = get_sms_settings('enable_firebase_otp') == '1';
 
         $firebaseConfig = (object) [
             'apiKey' => get_firebase_settings('firebase_api_key'),

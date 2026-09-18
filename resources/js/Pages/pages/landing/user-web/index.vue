@@ -218,7 +218,7 @@
   
   <script>
   import { useForm, router } from '@inertiajs/vue3';
-  import { getAuth, RecaptchaVerifier, signInWithPhoneNumber, PhoneAuthProvider, signInWithCredential } from 'firebase/auth';
+  import { getAuth, RecaptchaVerifier, signInWithPhoneNumber, PhoneAuthProvider, signInWithCredential, signOut } from 'firebase/auth';
   import axios from 'axios';
   import { initializeApp } from "firebase/app";
   import { initI18n } from '@/i18n';
@@ -239,6 +239,7 @@
         mobileExists: false,
         showOTPInput: false,
         verificationId: null,
+        firebaseIdToken: null,
         otpError: false,
         otpErrorMessage: 'The OTP provided is invalid',
         passwordError: false,
@@ -479,7 +480,9 @@
         const credential = PhoneAuthProvider.credential(this.verificationId, this.verificationCode);
 
         try {
-          await signInWithCredential(auth, credential);
+          const userCredential = await signInWithCredential(auth, credential);
+          // The server verifies this Firebase ID token (phone number, freshness, single use).
+          this.firebaseIdToken = await userCredential.user.getIdToken();
 
           if (this.mobileExists) {
             await this.loginWithOTP();
@@ -526,13 +529,32 @@
       // Login with OTP
       async loginWithOTP() {
         try {
-          // The server requires the verified OTP (single use) for passwordless login.
-          const response = await axios.post('/user/login', { mobile: this.phoneNumber, otp: this.verificationCode });
+          // The server requires proof of the number for passwordless login: the verified
+          // server OTP (single use), or the Firebase ID token from Firebase phone auth.
+          const payload = this.firebaseIdToken
+            ? { mobile: this.phoneNumber, firebase_id_token: this.firebaseIdToken }
+            : { mobile: this.phoneNumber, otp: this.verificationCode };
+          const response = await axios.post('/user/login', payload);
           if (response.data.success) {
             router.get('/create-booking');
           }
         } catch (error) {
-          console.error(t('error_logging_in_with_otp'), error);
+          console.error(this.t('error_logging_in_with_otp'), error);
+        } finally {
+          await this.signOutFirebase();
+        }
+      },
+
+      // The web session is the Laravel session, not Firebase: drop the Firebase sign-in.
+      async signOutFirebase() {
+        if (!this.firebaseIdToken) {
+          return;
+        }
+        this.firebaseIdToken = null;
+        try {
+          await signOut(getAuth(app));
+        } catch (error) {
+          console.error('Firebase sign-out failed', error);
         }
       },
 
@@ -544,7 +566,9 @@
             router.get('/create-booking');
           }
         } catch (error) {
-          console.error(t('error_registering_user'), error);
+          console.error(this.t('error_registering_user'), error);
+        } finally {
+          await this.signOutFirebase();
         }
       },
     },

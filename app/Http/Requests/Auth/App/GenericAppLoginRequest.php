@@ -19,7 +19,10 @@ class GenericAppLoginRequest extends BaseRequest
             'username'      => 'sometimes|required|exists:users,username',
             'mobile'=>'sometimes|required|mobile_number',
             'login_by'=>'sometimes|required',
-            'device_token'=>'sometimes|nullable'
+            'device_token'=>'sometimes|nullable',
+            // Mobile login without password needs one of these (enforced in LoginController).
+            'otp'=>'sometimes|nullable|string|max:20',
+            'firebase_id_token'=>'sometimes|nullable|string|max:4096',
         ];
     }
 }

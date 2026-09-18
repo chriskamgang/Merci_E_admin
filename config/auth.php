@@ -1,5 +1,7 @@
 <?php
 
+use App\Models\User;
+
 return [
 
     /*
@@ -62,7 +64,7 @@ return [
     'providers' => [
         'users' => [
             'driver' => 'eloquent',
-            'model' => App\Models\User::class,
+            'model' => User::class,
         ],
 
         // 'users' => [
@@ -126,5 +128,26 @@ return [
     */
 
     'legacy_mobile_login_without_otp' => (bool) env('AUTH_LEGACY_MOBILE_LOGIN_WITHOUT_OTP', false),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Firebase phone-auth OTP
+    |--------------------------------------------------------------------------
+    |
+    | Mobile login and password reset accept `firebase_id_token` (a Firebase ID
+    | token obtained by the app after Firebase phone verification) instead of a
+    | server SMS `otp`. See App\Base\Services\OTP\FirebasePhoneVerifier.
+    |
+    | replay_cache_store must be a store shared by all PHP workers and that
+    | survives between requests (file, redis, database...). Never "array".
+    |
+    */
+
+    'firebase_phone_auth' => [
+        'project_id' => env('FIREBASE_PHONE_AUTH_PROJECT_ID', 'mercie-app'),
+        'max_auth_age_minutes' => 10,
+        'replay_ttl_minutes' => 15,
+        'replay_cache_store' => env('FIREBASE_PHONE_AUTH_REPLAY_STORE', 'file'),
+    ],
 
 ];
