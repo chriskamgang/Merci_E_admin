@@ -490,8 +490,16 @@ class LoginController extends BaseLoginController
 
         $result = json_decode($response->body(), true);
 
-        if (isset($result['responsecode']) && $result['responsecode'] == 1) {
-            Log::info('Nexah SMS sent', ['mobile' => $number]);
+        // responsecode=1 only means the request was accepted; each recipient has its own
+        // status in sms[]. Drop any field that could echo the message (it contains the OTP).
+        $perSms = array_map(
+            fn ($sms) => is_array($sms) ? array_diff_key($sms, array_flip(['sms', 'message', 'text'])) : $sms,
+            is_array($result['sms'] ?? null) ? $result['sms'] : []
+        );
+        $delivered = collect($perSms)->contains(fn ($sms) => ($sms['status'] ?? '') === 'success');
+
+        if (isset($result['responsecode']) && $result['responsecode'] == 1 && $delivered) {
+            Log::info('Nexah SMS sent', ['mobile' => $number, 'sms' => $perSms]);
 
             return $this->respondSuccess();
         }
@@ -499,7 +507,8 @@ class LoginController extends BaseLoginController
         Log::error('Nexah SMS rejected', [
             'mobile' => $number,
             'http_status' => $response->status(),
-            'message' => $result['responsemessage'] ?? $response->body(),
+            'message' => $result['responsemessage'] ?? null,
+            'sms' => $perSms,
         ]);
 
         return $this->respondFailed();
