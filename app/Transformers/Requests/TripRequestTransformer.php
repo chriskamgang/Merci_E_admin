@@ -471,7 +471,7 @@ class TripRequestTransformer extends Transformer
                 'gateway' => $this->toCamelCase($gateway),
                 'enabled' => $flags["enable_{$gateway}"] ?? false,
                 'image' => $image,
-                'url' => route($gateway),
+                'url' => \Route::has($gateway) ? route($gateway) : null, // legacy gateway routes live in routes/disabled
             ];
         }
 
