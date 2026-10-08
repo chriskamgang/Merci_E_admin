@@ -222,14 +222,7 @@ class UserRegistrationController extends LoginController
              $validate_exists_email = $this->user->belongsTorole(Role::USER)->where('email', $request->email)->exists();
 
         if ($validate_exists_email) {
-
-             if($request->is_web){
-
-                $user = $this->user->belongsTorole(Role::USER)->where('email', $request->email)->first();
-
-                return $this->authenticateAndRespond($user, $request, $needsToken=true);
-
-            }
+            // No is_web shortcut: it returned a token for any existing account without OTP.
             $this->throwCustomException('Provided email has already been taken');
         }
 
@@ -244,14 +237,7 @@ class UserRegistrationController extends LoginController
         $validate_exists_mobile = $this->user->belongsTorole(Role::USER)->where('mobile', $mobile)->exists();
 
         if ($validate_exists_mobile) {
-
-            if($request->is_web){
-
-                $user = $this->user->belongsTorole(Role::USER)->where('mobile', $mobile)->first();
-
-                return $this->authenticateAndRespond($user, $request, $needsToken=true);
-
-            }
+            // No is_web shortcut: it returned a token for any existing account without OTP.
             $this->throwCustomException('Provided mobile has already been taken');
         }
 

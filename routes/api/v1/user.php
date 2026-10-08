@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Route;
 use App\Base\Constants\Auth\Role;
 use App\Http\Controllers\TripRequestController;
 use App\Http\Controllers\Api\V1\User\AccountController;
+use App\Http\Controllers\Api\V1\User\FirebaseTokenController;
 use App\Http\Controllers\Api\V1\User\ProfileController;
 
 /*
@@ -25,6 +26,10 @@ Route::prefix('user')->group(function () {
     // Logged‑in user info
     Route::middleware(['auth:sanctum', 'throttle:120,1'])
         ->get('/', [AccountController::class, 'me']);
+
+    // Firebase custom token so the apps can sign in to the Realtime Database
+    Route::middleware(['auth:sanctum', 'throttle:120,1'])
+        ->get('firebase-token', [FirebaseTokenController::class, 'token']);
 
     // Authenticated user routes
     Route::middleware(['auth:sanctum', 'throttle:120,1'])->group(function () {
